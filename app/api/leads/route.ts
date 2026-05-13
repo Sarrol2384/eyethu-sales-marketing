@@ -1,0 +1,230 @@
+import { NextResponse } from "next/server";
+import { leadSubmissionSchema } from "@/lib/validation/lead";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { normalizeSAPhone } from "@/lib/format/phone";
+import { scoreLead } from "@/lib/leads/score";
+import { sendAgentLeadEmail, sendLeadConfirmationEmail } from "@/lib/brevo/email";
+import { sendAgentLeadSMS } from "@/lib/brevo/sms";
+import { upsertBrevoContact } from "@/lib/brevo/contacts";
+import {
+  checkRateLimit,
+  clientIpFromRequest,
+} from "@/lib/api/rate-limit";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+export async function POST(request: Request) {
+  // ---------- Rate limit ----------
+  const ip = clientIpFromRequest(request);
+  const rl = checkRateLimit(`leads:${ip}`, { max: 5, windowMs: 60_000 });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many submissions — please wait a minute and try again." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)),
+        },
+      },
+    );
+  }
+
+  // ---------- Parse + validate ----------
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = leadSubmissionSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: "Please check your details and try again.",
+        details: parsed.error.flatten(),
+      },
+      { status: 400 },
+    );
+  }
+
+  // ---------- Honeypot ----------
+  if (parsed.data.hp_field && parsed.data.hp_field.length > 0) {
+    // Pretend it worked. Bots don't need to know.
+    return NextResponse.json({ ok: true }, { status: 200 });
+  }
+
+  const normalisedPhone = normalizeSAPhone(parsed.data.phone)!;
+  const email =
+    parsed.data.email && parsed.data.email.length > 0
+      ? parsed.data.email
+      : null;
+  const message =
+    parsed.data.message && parsed.data.message.length > 0
+      ? parsed.data.message
+      : null;
+
+  // ---------- Look up the property (for routing + scoring + Brevo context) ----------
+  const supabase = createSupabaseServiceClient();
+
+  type PropertyContext = {
+    id: string;
+    title: string;
+    slug: string;
+    suburb: string;
+    price: number;
+    agent_name: string | null;
+    agent_email: string | null;
+    agent_phone: string | null;
+  };
+
+  let property: PropertyContext | null = null;
+  if (parsed.data.property_id) {
+    const { data } = await supabase
+      .from("properties")
+      .select(
+        "id, title, slug, suburb, price, agent_name, agent_email, agent_phone",
+      )
+      .eq("id", parsed.data.property_id)
+      .maybeSingle();
+    property = (data as unknown as PropertyContext | null) ?? null;
+  }
+
+  // ---------- Score ----------
+  const { score, category, reasons } = scoreLead({
+    isFirstTimeBuyer: parsed.data.is_first_time_buyer,
+    moveTimeline: parsed.data.move_timeline ?? null,
+    hasEmail: !!email,
+    hasMessage: !!message,
+    propertyPrice: property?.price ?? null,
+  });
+
+  // ---------- Save the lead ----------
+  const { data: inserted, error: insertError } = await supabase
+    .from("leads")
+    .insert({
+      property_id: property?.id ?? null,
+      full_name: parsed.data.full_name.trim(),
+      phone: normalisedPhone,
+      email,
+      message,
+      is_first_time_buyer: parsed.data.is_first_time_buyer,
+      move_timeline: parsed.data.move_timeline ?? null,
+      source: parsed.data.source ?? null,
+      utm_source: parsed.data.utm_source ?? null,
+      utm_medium: parsed.data.utm_medium ?? null,
+      utm_campaign: parsed.data.utm_campaign ?? null,
+      lead_score: score,
+      lead_category: category,
+      ai_summary: reasons.join(" · "),
+      contacted: false,
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !inserted) {
+    console.error("[leads] insert failed", insertError);
+    return NextResponse.json(
+      { error: "Could not save your enquiry. Please try again." },
+      { status: 500 },
+    );
+  }
+
+  // ---------- Fire-and-forget side effects ----------
+  // These run in parallel and we don't await them blocking — but in a route
+  // handler we DO need to await; otherwise the function ends before they fire.
+  // For latency we await them with a soft timeout via Promise.allSettled.
+  const [firstName, ...lastNameParts] = parsed.data.full_name.trim().split(/\s+/);
+
+  const propertyUrl = property
+    ? `${SITE_URL}/property/${property.slug}`
+    : SITE_URL;
+
+  const sideEffects: Array<Promise<unknown>> = [];
+
+  if (property?.agent_email) {
+    sideEffects.push(
+      sendAgentLeadEmail({
+        agentEmail: property.agent_email,
+        agentName: property.agent_name,
+        leadName: parsed.data.full_name,
+        leadPhone: normalisedPhone,
+        leadEmail: email,
+        leadMessage: message,
+        isFirstTimeBuyer: parsed.data.is_first_time_buyer,
+        moveTimeline: parsed.data.move_timeline ?? null,
+        property: {
+          title: property.title,
+          suburb: property.suburb,
+          price: Number(property.price),
+          slug: property.slug,
+        },
+        siteUrl: SITE_URL,
+      }).catch((err) =>
+        console.error("[leads] sendAgentLeadEmail failed", err),
+      ),
+    );
+  }
+
+  if (email) {
+    sideEffects.push(
+      sendLeadConfirmationEmail({
+        leadEmail: email,
+        leadName: parsed.data.full_name,
+        property: property
+          ? {
+              title: property.title,
+              suburb: property.suburb,
+              slug: property.slug,
+            }
+          : null,
+        agentName: property?.agent_name ?? null,
+        agentPhone: property?.agent_phone ?? null,
+        siteUrl: SITE_URL,
+      }).catch((err) =>
+        console.error("[leads] sendLeadConfirmationEmail failed", err),
+      ),
+    );
+  }
+
+  if (category === "hot" && property?.agent_phone) {
+    sideEffects.push(
+      sendAgentLeadSMS({
+        agentPhone: property.agent_phone,
+        leadName: parsed.data.full_name,
+        leadPhone: normalisedPhone,
+        propertyTitle: property.title,
+        suburb: property.suburb,
+      }).catch((err) => console.error("[leads] sendAgentLeadSMS failed", err)),
+    );
+  }
+
+  if (email) {
+    sideEffects.push(
+      upsertBrevoContact({
+        email,
+        phone: normalisedPhone,
+        firstName,
+        lastName: lastNameParts.join(" ") || null,
+        attributes: {
+          propertyInterest: property?.title ?? null,
+          suburb: property?.suburb ?? null,
+          budget: property?.price ?? null,
+          isFirstTimeBuyer: parsed.data.is_first_time_buyer,
+          moveTimeline: parsed.data.move_timeline ?? null,
+          leadCategory: category,
+        },
+      }).catch((err) =>
+        console.error("[leads] upsertBrevoContact failed", err),
+      ),
+    );
+  }
+
+  await Promise.allSettled(sideEffects);
+
+  void propertyUrl;
+  return NextResponse.json({
+    ok: true,
+    lead: { id: inserted.id, score, category },
+  });
+}
