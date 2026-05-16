@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
-import { LoginForm } from "./LoginForm";
+import Image from "next/image";
+import { LoginForm } from "@/components/auth/LoginForm";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Admin login",
@@ -15,17 +18,25 @@ export default async function LoginPage({
 }) {
   const { redirectTo } = await searchParams;
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Eyethu PG Admin
-          </h1>
+    <main className="flex flex-1 flex-col items-center justify-center bg-muted/30 px-4 py-12">
+      <div className="w-full max-w-sm space-y-7">
+        <div className="flex flex-col items-center gap-4">
+          <Image
+            src="/eyethu-logo.png"
+            alt="Eyethu Property Group"
+            width={320}
+            height={128}
+            className="h-auto w-full max-w-[min(100%,18rem)] max-h-28 object-contain"
+            priority
+          />
           <p className="text-sm text-muted-foreground">
             Sign in to manage listings and leads.
           </p>
         </div>
-        <LoginForm redirectTo={redirectTo ?? "/admin"} />
+        <LoginForm
+          redirectTo={redirectTo ?? "/admin"}
+          redirectFallback="/admin"
+        />
       </div>
     </main>
   );

@@ -11,6 +11,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatRelative } from "@/lib/format/date";
 import { formatZAR } from "@/lib/format/currency";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminDashboardPage() {
   const supabase = await createSupabaseServerClient();
 

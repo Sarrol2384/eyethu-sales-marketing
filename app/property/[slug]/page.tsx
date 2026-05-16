@@ -14,6 +14,8 @@ import { LeadCaptureForm } from "@/components/property/LeadCaptureForm";
 import { AgentCard } from "@/components/property/AgentCard";
 import { ShareButtons } from "@/components/property/ShareButtons";
 import { ViewTracker } from "@/components/property/ViewTracker";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDashboardRole } from "@/lib/auth/dashboard-access";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -85,6 +87,18 @@ export default async function PropertyPage({ params }: PageProps) {
   const priceLabel = formatZAR(property.price);
   const propertyUrl = `${SITE_URL}/property/${property.slug}`;
 
+  const supabase = await createSupabaseServerClient();
+  let shareReferralUserId: string | null = null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    const role = await getDashboardRole(supabase, user.id);
+    if (role === "agent") {
+      shareReferralUserId = user.id;
+    }
+  }
+
   const images = property.property_images.map((img) => ({
     url: img.image_url,
     alt: img.alt_text ?? property.title,
@@ -123,9 +137,6 @@ export default async function PropertyPage({ params }: PageProps) {
               : ""}
           </Badge>
         )}
-        {property.year_built && (
-          <Badge variant="outline">Built {property.year_built}</Badge>
-        )}
       </div>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_360px]">
@@ -162,6 +173,7 @@ export default async function PropertyPage({ params }: PageProps) {
               title={property.title}
               price={priceLabel}
               suburb={property.suburb}
+              referralUserId={shareReferralUserId}
             />
           </section>
         </div>

@@ -41,6 +41,7 @@ const TIMELINE_OPTIONS: MoveTimelineValue[] = [
 
 export function LeadCaptureForm({ propertyId, propertyTitle, cta }: Props) {
   const [submitted, setSubmitted] = useState(false);
+  const [submittedWithoutEmail, setSubmittedWithoutEmail] = useState(false);
 
   const form = useForm<LeadSubmission>({
     // Cast — zod 4 distinguishes input vs output types when defaults exist; we
@@ -86,6 +87,8 @@ export function LeadCaptureForm({ propertyId, propertyTitle, cta }: Props) {
         throw new Error(body?.error ?? "Something went wrong. Please try again.");
       }
 
+      const hadEmail = Boolean(values.email?.trim());
+      setSubmittedWithoutEmail(!hadEmail);
       setSubmitted(true);
       toast.success("Thanks! We'll be in touch shortly.");
     } catch (err) {
@@ -103,8 +106,20 @@ export function LeadCaptureForm({ propertyId, propertyTitle, cta }: Props) {
           <p className="max-w-md text-sm text-muted-foreground">
             We&apos;ve received your enquiry about{" "}
             <strong>{propertyTitle}</strong>. One of our agents will call you
-            shortly. If you provided your email, watch your inbox for a
-            confirmation.
+            shortly.
+            {submittedWithoutEmail ? (
+              <>
+                {" "}
+                You didn&apos;t add an email, so we won&apos;t send a
+                confirmation message — we&apos;ll use the phone number you
+                gave.
+              </>
+            ) : (
+              <>
+                {" "}
+                Watch your inbox for a short confirmation email.
+              </>
+            )}
           </p>
         </CardContent>
       </Card>
@@ -327,9 +342,13 @@ function Field({
 function readUtm() {
   if (typeof window === "undefined") return {};
   const params = new URLSearchParams(window.location.search);
+  // Also check sessionStorage in case the ?ref was set on a previous page load.
+  const refFromStorage = sessionStorage.getItem("eyethu_ref");
+  const ref = params.get("ref") || refFromStorage || null;
   return {
     utm_source: params.get("utm_source") || null,
     utm_medium: params.get("utm_medium") || null,
     utm_campaign: params.get("utm_campaign") || null,
+    ref,
   };
 }

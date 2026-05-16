@@ -55,6 +55,21 @@ export const propertyFormSchema = z.object({
     .union([z.string().trim().email(), z.literal("")])
     .optional(),
   agent_photo_url: z.string().trim().url().optional().or(z.literal("")),
+
+  /** Admin-only: login email of the agent who should manage this listing in /agent */
+  assigned_agent_email: z
+    .union([z.string().trim().email(), z.literal("")])
+    .optional(),
+
+  /** Admin-only: assign by agent_accounts.user_id (preferred when set) */
+  assigned_user_id: z
+    .union([z.string().uuid(), z.literal("")])
+    .optional(),
+
+  /** Admin-only: agent who brought / mandated the listing */
+  sourced_by_user_id: z
+    .union([z.string().uuid(), z.literal("")])
+    .optional(),
 });
 
 export type PropertyFormInput = z.infer<typeof propertyFormSchema>;

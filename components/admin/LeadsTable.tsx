@@ -56,15 +56,24 @@ export type AdminLead = {
     slug: string;
     suburb: string;
   } | null;
+  /** Display name of the agent attributed via share link, if any. */
+  attributed_agent_label: string | null;
 };
 
 type Props = {
   leads: AdminLead[];
   currentSort: string;
   currentDir: string;
+  /** Base path for sort links (default admin leads). */
+  listBasePath?: string;
 };
 
-export function LeadsTable({ leads, currentSort, currentDir }: Props) {
+export function LeadsTable({
+  leads,
+  currentSort,
+  currentDir,
+  listBasePath = "/admin/leads",
+}: Props) {
   const router = useRouter();
   const params = useSearchParams();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -78,7 +87,7 @@ export function LeadsTable({ leads, currentSort, currentDir }: Props) {
       next.set("sort", key);
       next.set("dir", "desc");
     }
-    router.replace(`/admin/leads?${next.toString()}`);
+    router.replace(`${listBasePath}?${next.toString()}`);
   }
 
   function handleMarkContacted(id: string, contacted: boolean) {
@@ -314,6 +323,12 @@ function LeadRow({
                       : "Not yet"
                   }
                 />
+                {lead.attributed_agent_label && (
+                  <DetailRow
+                    label="Attributed to agent"
+                    value={lead.attributed_agent_label}
+                  />
+                )}
               </div>
 
               {lead.message && (

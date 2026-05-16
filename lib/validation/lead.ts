@@ -57,6 +57,8 @@ export const leadSubmissionSchema = z.object({
   utm_medium: z.string().max(120).optional().nullable(),
   utm_campaign: z.string().max(120).optional().nullable(),
   source: z.string().max(120).optional().nullable(),
+  /** Agent user_id from the ?ref= share-link query param. */
+  ref: z.string().uuid().optional().nullable(),
 });
 
 export type LeadSubmission = z.infer<typeof leadSubmissionSchema>;

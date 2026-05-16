@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Home, ArrowRight } from "lucide-react";
+import { Home, ArrowRight, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
@@ -10,19 +10,28 @@ export default function NotFound() {
           404
         </span>
         <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-          That listing has flown the coop
+          Page not found
         </h1>
         <p className="text-balance text-muted-foreground">
-          It might have been sold, taken off the market, or moved. Have a look
-          at what we have available right now.
+          This address doesn&apos;t match anything on the site. If you were
+          looking for a listing, it may have been removed or the link may be
+          out of date.
         </p>
-        <Button asChild size="lg">
-          <Link href="/">
-            <Home className="size-4" />
-            Browse all properties
-            <ArrowRight className="size-4" />
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <Button asChild size="lg">
+            <Link href="/">
+              <Home className="size-4" />
+              Browse properties
+              <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link href="/admin/login">
+              <LogIn className="size-4" />
+              Admin sign in
+            </Link>
+          </Button>
+        </div>
       </div>
     </main>
   );

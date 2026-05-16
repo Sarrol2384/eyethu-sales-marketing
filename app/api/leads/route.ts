@@ -10,6 +10,11 @@ import {
   checkRateLimit,
   clientIpFromRequest,
 } from "@/lib/api/rate-limit";
+import {
+  resolveAgentLeadEmailRecipient,
+  resolveAgentLeadSmsPhone,
+  type PropertyNotifyContext,
+} from "@/lib/leads/resolve-agent-notify";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -67,27 +72,29 @@ export async function POST(request: Request) {
   // ---------- Look up the property (for routing + scoring + Brevo context) ----------
   const supabase = createSupabaseServiceClient();
 
-  type PropertyContext = {
-    id: string;
-    title: string;
-    slug: string;
-    suburb: string;
-    price: number;
-    agent_name: string | null;
-    agent_email: string | null;
-    agent_phone: string | null;
-  };
-
-  let property: PropertyContext | null = null;
+  let property: PropertyNotifyContext | null = null;
   if (parsed.data.property_id) {
     const { data } = await supabase
       .from("properties")
       .select(
-        "id, title, slug, suburb, price, agent_name, agent_email, agent_phone",
+        "id, title, slug, suburb, price, agent_name, agent_email, agent_phone, assigned_user_id, sourced_by_user_id",
       )
       .eq("id", parsed.data.property_id)
       .maybeSingle();
-    property = (data as unknown as PropertyContext | null) ?? null;
+    property = (data as unknown as PropertyNotifyContext | null) ?? null;
+  }
+
+  // ---------- Resolve attribution (agent share-link ?ref=<uuid>) ----------
+  let attributedAgentUserId: string | null = null;
+  if (parsed.data.ref) {
+    const { data: agentAcct } = await supabase
+      .from("agent_accounts")
+      .select("user_id")
+      .eq("user_id", parsed.data.ref)
+      .maybeSingle();
+    if (agentAcct) {
+      attributedAgentUserId = agentAcct.user_id;
+    }
   }
 
   // ---------- Score ----------
@@ -117,6 +124,7 @@ export async function POST(request: Request) {
       lead_score: score,
       lead_category: category,
       ai_summary: reasons.join(" · "),
+      attributed_agent_user_id: attributedAgentUserId,
       contacted: false,
     })
     .select("id")
@@ -142,29 +150,48 @@ export async function POST(request: Request) {
 
   const sideEffects: Array<Promise<unknown>> = [];
 
-  if (property?.agent_email) {
+  const agentEmailRecipient = await resolveAgentLeadEmailRecipient(
+    supabase,
+    property,
+    attributedAgentUserId,
+  );
+
+  if (agentEmailRecipient) {
     sideEffects.push(
       sendAgentLeadEmail({
-        agentEmail: property.agent_email,
-        agentName: property.agent_name,
+        agentEmail: agentEmailRecipient.email,
+        agentName: agentEmailRecipient.name,
         leadName: parsed.data.full_name,
         leadPhone: normalisedPhone,
         leadEmail: email,
         leadMessage: message,
         isFirstTimeBuyer: parsed.data.is_first_time_buyer,
         moveTimeline: parsed.data.move_timeline ?? null,
-        property: {
-          title: property.title,
-          suburb: property.suburb,
-          price: Number(property.price),
-          slug: property.slug,
-        },
+        property: property
+          ? {
+              title: property.title,
+              suburb: property.suburb,
+              price: Number(property.price),
+              slug: property.slug,
+            }
+          : null,
         siteUrl: SITE_URL,
       }).catch((err) =>
         console.error("[leads] sendAgentLeadEmail failed", err),
       ),
     );
+  } else if (property ?? attributedAgentUserId) {
+    console.warn(
+      "[leads] no agent email recipient — property card, ref agent, and roster emails all empty",
+      { propertyId: property?.id ?? null, attributedAgentUserId },
+    );
   }
+
+  const agentSmsPhone = await resolveAgentLeadSmsPhone(
+    supabase,
+    property,
+    attributedAgentUserId,
+  );
 
   if (email) {
     sideEffects.push(
@@ -187,10 +214,10 @@ export async function POST(request: Request) {
     );
   }
 
-  if (category === "hot" && property?.agent_phone) {
+  if (category === "hot" && agentSmsPhone && property) {
     sideEffects.push(
       sendAgentLeadSMS({
-        agentPhone: property.agent_phone,
+        agentPhone: agentSmsPhone,
         leadName: parsed.data.full_name,
         leadPhone: normalisedPhone,
         propertyTitle: property.title,

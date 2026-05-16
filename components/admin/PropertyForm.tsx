@@ -27,6 +27,13 @@ import {
 import { createProperty, updateProperty } from "@/lib/actions/properties";
 import { ImageUploader } from "./ImageUploader";
 
+export type PropertyFormAgentOption = {
+  user_id: string;
+  display_name: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
 type Mode = "create" | "edit";
 
 type Props = {
@@ -39,6 +46,12 @@ type Props = {
     is_primary: boolean;
     display_order: number;
   }>;
+  /** When true, show field to assign listing to an agent (Supabase Auth email). */
+  allowAgentAssignment?: boolean;
+  /** When set, admin can pick an agent from the roster (requires migration profile columns). */
+  agents?: PropertyFormAgentOption[];
+  /** Used after create and for navigation context; default `/admin/properties`. */
+  propertiesBasePath?: string;
 };
 
 const DEFAULT_VALUES: PropertyFormInput = {
@@ -72,6 +85,9 @@ const DEFAULT_VALUES: PropertyFormInput = {
   agent_phone: "",
   agent_email: "",
   agent_photo_url: "",
+  assigned_agent_email: "",
+  assigned_user_id: "",
+  sourced_by_user_id: "",
 };
 
 export function PropertyForm({
@@ -79,6 +95,9 @@ export function PropertyForm({
   propertyId,
   initialValues,
   initialImages = [],
+  allowAgentAssignment = false,
+  agents = [],
+  propertiesBasePath = "/admin/properties",
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -95,6 +114,7 @@ export function PropertyForm({
     handleSubmit,
     watch,
     setValue,
+    setError,
     formState: { errors },
   } = form;
 
@@ -103,6 +123,8 @@ export function PropertyForm({
   const status = watch("status");
   const propertyType = watch("property_type");
   const listingType = watch("listing_type");
+  const assignedUserId = watch("assigned_user_id");
+  const sourcedByUserId = watch("sourced_by_user_id");
 
   function toggleFeature(feature: string) {
     const next = features.includes(feature)
@@ -183,12 +205,19 @@ export function PropertyForm({
           : await updateProperty(propertyId!, values);
 
       if (!result.ok) {
+        if (result.fieldErrors) {
+          for (const [key, msg] of Object.entries(result.fieldErrors)) {
+            if (msg) {
+              setError(key as keyof PropertyFormInput, { message: msg });
+            }
+          }
+        }
         toast.error(result.error ?? "Could not save");
         return;
       }
       toast.success(mode === "create" ? "Listing created" : "Listing saved");
       if (mode === "create" && "id" in result && result.id) {
-        router.push(`/admin/properties/${result.id}/edit`);
+        router.push(`${propertiesBasePath}/${result.id}/edit`);
       } else {
         router.refresh();
       }
@@ -357,7 +386,7 @@ export function PropertyForm({
             />
           </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label="Floor size (m²)"
             htmlFor="floor_size_sqm"
@@ -382,19 +411,6 @@ export function PropertyForm({
               min={0}
               step="1"
               {...register("erf_size_sqm")}
-            />
-          </Field>
-          <Field
-            label="Year built"
-            htmlFor="year_built"
-            error={errors.year_built?.message}
-          >
-            <Input
-              id="year_built"
-              type="number"
-              min={1800}
-              max={2100}
-              {...register("year_built")}
             />
           </Field>
         </div>
@@ -485,6 +501,183 @@ export function PropertyForm({
           />
         </Field>
       </Section>
+
+      {allowAgentAssignment && (
+        <Section title="Dashboard assignment">
+          {agents.length > 0 ? (
+            <>
+              <Field
+                label="Sourcing agent (who brought the listing)"
+                htmlFor="sourced_by_user_select"
+                error={errors.sourced_by_user_id?.message}
+              >
+                <Select
+                  value={
+                    sourcedByUserId?.trim()
+                      ? sourcedByUserId.trim()
+                      : "__none__"
+                  }
+                  onValueChange={(v) => {
+                    if (v === "__none__") {
+                      setValue("sourced_by_user_id", "", {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                      return;
+                    }
+                    setValue("sourced_by_user_id", v, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                  }}
+                >
+                  <SelectTrigger
+                    id="sourced_by_user_select"
+                    className="w-full max-w-md"
+                  >
+                    <SelectValue placeholder="No sourcing agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No sourcing agent</SelectItem>
+                    {agents.map((a) => (
+                      <SelectItem key={`src-${a.user_id}`} value={a.user_id}>
+                        {a.display_name?.trim() || a.email || a.user_id}
+                        {a.email && a.display_name?.trim()
+                          ? ` · ${a.email}`
+                          : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field
+                label="Assigned agent"
+                htmlFor="assigned_user_select"
+                error={errors.assigned_user_id?.message}
+              >
+                <Select
+                  value={
+                    assignedUserId?.trim() ? assignedUserId.trim() : "__none__"
+                  }
+                  onValueChange={(v) => {
+                    if (v === "__none__") {
+                      setValue("assigned_user_id", "", {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                      setValue("assigned_agent_email", "", {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                      return;
+                    }
+                    setValue("assigned_user_id", v, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                    const a = agents.find((x) => x.user_id === v);
+                    if (a) {
+                      setValue("assigned_agent_email", a.email?.trim() ?? "", {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                      if (a.display_name?.trim()) {
+                        setValue("agent_name", a.display_name.trim(), {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }
+                      if (a.phone?.trim()) {
+                        setValue("agent_phone", a.phone.trim(), {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }
+                      if (a.email?.trim()) {
+                        setValue("agent_email", a.email.trim(), {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    id="assigned_user_select"
+                    className="w-full max-w-md"
+                  >
+                    <SelectValue placeholder="No agent assigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No agent assigned</SelectItem>
+                    {agents.map((a) => (
+                      <SelectItem key={a.user_id} value={a.user_id}>
+                        {a.display_name?.trim() || a.email || a.user_id}
+                        {a.email && a.display_name?.trim()
+                          ? ` · ${a.email}`
+                          : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field
+                label="Or assign by login email"
+                htmlFor="assigned_agent_email"
+                error={errors.assigned_agent_email?.message}
+              >
+                <Input
+                  id="assigned_agent_email"
+                  type="email"
+                  autoComplete="off"
+                  placeholder="agent@example.com"
+                  {...register("assigned_agent_email", {
+                    onChange: () => {
+                      setValue("assigned_user_id", "", {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    },
+                  })}
+                />
+              </Field>
+              <p className="text-xs text-muted-foreground">
+                Pick an agent from the list, or type their login email. They
+                must have an agent account (
+                <code className="rounded bg-muted px-1">/admin/agents</code>
+                ). They see assigned listings under{" "}
+                <code className="rounded bg-muted px-1">/agent/properties</code>
+                .
+              </p>
+            </>
+          ) : (
+            <>
+              <Field
+                label="Assigned agent (login email)"
+                htmlFor="assigned_agent_email"
+                error={errors.assigned_agent_email?.message}
+              >
+                <Input
+                  id="assigned_agent_email"
+                  type="email"
+                  autoComplete="off"
+                  placeholder="agent@example.com"
+                  {...register("assigned_agent_email")}
+                />
+              </Field>
+              <p className="text-xs text-muted-foreground">
+                This user must exist in Supabase Auth and have a row in{" "}
+                <code className="rounded bg-muted px-1">agent_accounts</code> so
+                they can sign in and use{" "}
+                <code className="rounded bg-muted px-1">/agent/properties</code>
+                . Add agents under{" "}
+                <code className="rounded bg-muted px-1">/admin/agents</code>.
+                Leave empty to unassign.
+              </p>
+            </>
+          )}
+        </Section>
+      )}
 
       <Section title="Agent">
         <div className="grid gap-4 sm:grid-cols-2">

@@ -26,9 +26,16 @@ type Props = {
   id: string;
   status: PropertyStatus;
   title: string;
+  /** When false, hide delete (e.g. agent portal). */
+  allowDelete?: boolean;
 };
 
-export function PropertyRowActions({ id, status, title }: Props) {
+export function PropertyRowActions({
+  id,
+  status,
+  title,
+  allowDelete = true,
+}: Props) {
   const [isPending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -83,14 +90,18 @@ export function PropertyRowActions({ id, status, title }: Props) {
               Mark as sold
             </DropdownMenuItem>
           )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setConfirmDelete(true)}
-            className="text-destructive focus:text-destructive"
-          >
-            <Trash2 className="size-4" />
-            Delete
-          </DropdownMenuItem>
+          {allowDelete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setConfirmDelete(true)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="size-4" />
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

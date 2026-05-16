@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Image from "next/image";
 import { Home, MapPin } from "lucide-react";
 import { FilterBar } from "@/components/home/FilterBar";
 import { PropertyCard } from "@/components/home/PropertyCard";
@@ -54,18 +55,29 @@ export default async function HomePage({
 
   return (
     <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-16 pt-6 sm:px-6 lg:px-8">
-      <header className="mb-8 space-y-3 text-center sm:text-left">
-        <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-primary">
-          <MapPin className="size-3" />
+      {/* Site nav */}
+      <nav className="mb-10 flex items-center justify-between">
+        <Image
+          src="/eyethu-logo.png"
+          alt="Eyethu Property Group"
+          width={280}
+          height={112}
+          className="h-auto max-h-20 w-auto max-w-[min(70vw,16rem)] sm:max-h-24 sm:max-w-[20rem] object-contain"
+          priority
+        />
+        <div className="hidden items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground sm:flex">
+          <MapPin className="size-3 text-primary" />
           Western Cape · South Africa
         </div>
+      </nav>
+
+      <header className="mb-8 space-y-3">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
           Find your first home
         </h1>
         <p className="max-w-2xl text-base text-muted-foreground">
           Affordable houses, townhouses and apartments across the Western Cape
-          — including secure gated communities — curated for first-time buyers
-          by Eyethu Property Group.
+          — including secure gated communities — curated for first-time buyers.
         </p>
       </header>
 
@@ -85,8 +97,17 @@ export default async function HomePage({
         </div>
       )}
 
-      <footer className="mt-16 border-t pt-6 text-center text-sm text-muted-foreground">
-        Powered by Eyethu Property Group · Cape Town
+      <footer className="mt-16 flex flex-col items-center gap-3 border-t pt-8">
+        <Image
+          src="/eyethu-logo.png"
+          alt="Eyethu Property Group"
+          width={240}
+          height={96}
+          className="h-auto max-h-16 w-auto max-w-[min(90vw,15rem)] object-contain opacity-80"
+        />
+        <p className="text-xs text-muted-foreground">
+          MJG Real Estate T/A Eyethu Property Group · Cape Town · Western Cape
+        </p>
       </footer>
     </main>
   );

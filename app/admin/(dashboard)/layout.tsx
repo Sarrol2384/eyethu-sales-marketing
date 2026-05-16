@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getDashboardRole } from "@/lib/auth/dashboard-access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/admin/Sidebar";
 
@@ -15,11 +16,16 @@ export default async function DashboardLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/admin/login");
 
+  const role = await getDashboardRole(supabase, user.id);
+  if (role === "agent") {
+    redirect("/agent/properties");
+  }
+
   return (
-    <div className="flex min-h-screen w-full bg-muted/30">
+    <div className="flex min-h-screen w-full bg-muted/20">
       <Sidebar userEmail={user.email ?? null} />
-      <div className="flex flex-1 flex-col">
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+      <div className="flex flex-1 flex-col min-w-0">
+        <main className="flex-1 px-5 py-7 sm:px-8">{children}</main>
       </div>
     </div>
   );

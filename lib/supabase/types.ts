@@ -51,6 +51,18 @@ export type PropertyRow = {
   agent_phone: string | null;
   agent_email: string | null;
   agent_photo_url: string | null;
+  /** Supabase Auth user id of the listing agent (dashboard scope). */
+  assigned_user_id: string | null;
+  /** Auth user id of the agent who sourced / mandated this listing. */
+  sourced_by_user_id: string | null;
+};
+
+export type AgentAccountRow = {
+  user_id: string;
+  created_at: string;
+  display_name: string | null;
+  phone: string | null;
+  email: string | null;
 };
 
 export type PropertyImageRow = {
@@ -83,6 +95,8 @@ export type LeadRow = {
   contacted: boolean;
   contacted_at: string | null;
   consent_given_at: string;
+  /** Auth user id of the agent whose share link was used to reach the site. */
+  attributed_agent_user_id: string | null;
 };
 
 export type PageViewInsert = {
@@ -106,6 +120,15 @@ export type PageViewInsert = {
 export type Database = {
   public: {
     Tables: {
+      agent_accounts: {
+        Row: AgentAccountRow;
+        Insert: Pick<AgentAccountRow, "user_id"> &
+          Partial<
+            Pick<AgentAccountRow, "display_name" | "phone" | "email">
+          >;
+        Update: Partial<AgentAccountRow>;
+        Relationships: [];
+      };
       properties: {
         Row: PropertyRow;
         Insert: Partial<PropertyRow>;

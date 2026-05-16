@@ -59,15 +59,26 @@ export function AgentCard({
 
       <div className="space-y-2">
         {waUrl && (
-          <Button
-            asChild
-            className="w-full bg-whatsapp text-whatsapp-foreground hover:bg-whatsapp/90"
-          >
-            <a href={waUrl} target="_blank" rel="noopener noreferrer">
-              <MessageCircle className="size-4" />
-              WhatsApp the agent
-            </a>
-          </Button>
+          <div className="space-y-2">
+            <Button
+              asChild
+              className="w-full bg-whatsapp text-whatsapp-foreground hover:bg-whatsapp/90"
+            >
+              <a href={waUrl} target="_blank" rel="noopener noreferrer">
+                <MessageCircle className="size-4" />
+                WhatsApp the agent
+              </a>
+            </Button>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              This opens WhatsApp on your phone or computer. We only save your
+              details as a lead when you use the{" "}
+              <span className="font-medium text-foreground">
+                Enquire about this home
+              </span>{" "}
+              form — that way we can follow up properly and keep your information
+              in line with our privacy notice.
+            </p>
+          </div>
         )}
         {normalisedPhone && (
           <Button asChild variant="outline" className="w-full">

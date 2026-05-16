@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { PropertyForm } from "@/components/admin/PropertyForm";
 import type {
   PropertyImageRow,
@@ -29,6 +30,28 @@ export default async function EditPropertyPage({ params }: PageProps) {
   const row = data as unknown as PropertyRow & {
     property_images: PropertyImageRow[];
   };
+
+  const { data: agentList } = await supabase
+    .from("agent_accounts")
+    .select("user_id, display_name, email, phone")
+    .order("display_name", { ascending: true, nullsFirst: false });
+
+  let assignedAgentEmail = "";
+  if (row.assigned_user_id) {
+    const roster = (agentList ?? []).find(
+      (a) => a.user_id === row.assigned_user_id,
+    );
+    if (roster?.email?.trim()) {
+      assignedAgentEmail = roster.email.trim();
+    } else {
+      const svc = createSupabaseServiceClient();
+      const { data: authUser, error: authErr } =
+        await svc.auth.admin.getUserById(row.assigned_user_id);
+      if (!authErr && authUser.user?.email) {
+        assignedAgentEmail = authUser.user.email;
+      }
+    }
+  }
 
   const initial: Partial<PropertyFormInput> = {
     title: row.title,
@@ -63,6 +86,9 @@ export default async function EditPropertyPage({ params }: PageProps) {
     agent_phone: row.agent_phone ?? "",
     agent_email: row.agent_email ?? "",
     agent_photo_url: row.agent_photo_url ?? "",
+    assigned_agent_email: assignedAgentEmail,
+    assigned_user_id: row.assigned_user_id ?? "",
+    sourced_by_user_id: row.sourced_by_user_id ?? "",
   };
 
   return (
@@ -76,6 +102,8 @@ export default async function EditPropertyPage({ params }: PageProps) {
         is_primary: img.is_primary,
         display_order: img.display_order,
       }))}
+      allowAgentAssignment
+      agents={agentList ?? []}
     />
   );
 }

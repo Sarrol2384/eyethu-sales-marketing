@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { assertDashboardAdmin, getDashboardRole } from "@/lib/auth/dashboard-access";
+import { resolveUserIdByEmail } from "@/lib/auth/resolve-user-by-email";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { propertyFormSchema, type PropertyFormInput } from "@/lib/validation/property";
 import { buildPropertySlug, bumpSlug } from "@/lib/slugify";
@@ -9,7 +11,9 @@ import { buildPropertySlug, bumpSlug } from "@/lib/slugify";
 export type PropertyActionState = {
   ok: boolean;
   error: string | null;
-  fieldErrors?: Partial<Record<keyof PropertyFormInput, string>>;
+  fieldErrors?: Partial<
+    Record<keyof PropertyFormInput, string>
+  >;
 };
 
 const SUCCESS: PropertyActionState = { ok: true, error: null };
@@ -22,13 +26,14 @@ async function requireUser() {
   if (!user) {
     throw new Error("Unauthorized");
   }
-  return supabase;
+  return { supabase, user };
 }
 
 export async function createProperty(
   input: PropertyFormInput,
 ): Promise<PropertyActionState & { id?: string; slug?: string }> {
-  const supabase = await requireUser();
+  const { supabase, user } = await requireUser();
+  await assertDashboardAdmin(supabase, user.id);
 
   const parsed = propertyFormSchema.safeParse(input);
   if (!parsed.success) {
@@ -45,6 +50,75 @@ export async function createProperty(
   }
 
   const data = parsed.data;
+
+  let assignedUserId: string | null = null;
+  const uid = data.assigned_user_id?.trim();
+  if (uid) {
+    const { data: acct } = await supabase
+      .from("agent_accounts")
+      .select("user_id")
+      .eq("user_id", uid)
+      .maybeSingle();
+    if (!acct) {
+      return {
+        ok: false,
+        error: "Selected agent is invalid or no longer exists.",
+        fieldErrors: {
+          assigned_user_id: "Pick a valid agent or leave unassigned.",
+        },
+      };
+    }
+    assignedUserId = uid;
+  } else {
+    const assignEmail = data.assigned_agent_email?.trim();
+    if (assignEmail) {
+      assignedUserId = await resolveUserIdByEmail(assignEmail);
+      if (!assignedUserId) {
+        return {
+          ok: false,
+          error: "No dashboard user found with that assigned agent email.",
+          fieldErrors: {
+            assigned_agent_email: "Check the login email and try again.",
+          },
+        };
+      }
+      const { data: acct } = await supabase
+        .from("agent_accounts")
+        .select("user_id")
+        .eq("user_id", assignedUserId)
+        .maybeSingle();
+      if (!acct) {
+        return {
+          ok: false,
+          error: "That user is not registered as an agent.",
+          fieldErrors: {
+            assigned_agent_email:
+              "Create an agent account first under Agents.",
+          },
+        };
+      }
+    }
+  }
+
+  let sourcedByUserId: string | null = null;
+  const sourcedUid = data.sourced_by_user_id?.trim();
+  if (sourcedUid) {
+    const { data: srcAcct } = await supabase
+      .from("agent_accounts")
+      .select("user_id")
+      .eq("user_id", sourcedUid)
+      .maybeSingle();
+    if (!srcAcct) {
+      return {
+        ok: false,
+        error: "Selected sourcing agent is invalid or no longer exists.",
+        fieldErrors: {
+          sourced_by_user_id: "Pick a valid agent or leave unassigned.",
+        },
+      };
+    }
+    sourcedByUserId = sourcedUid;
+  }
 
   // Generate a unique slug with retry on conflict.
   let slug = buildPropertySlug(data.title, data.suburb);
@@ -83,6 +157,8 @@ export async function createProperty(
         agent_phone: data.agent_phone || null,
         agent_email: data.agent_email || null,
         agent_photo_url: data.agent_photo_url || null,
+        assigned_user_id: assignedUserId,
+        sourced_by_user_id: sourcedByUserId,
         published_at: data.status === "published" ? new Date().toISOString() : null,
       })
       .select("id, slug")
@@ -90,6 +166,8 @@ export async function createProperty(
 
     if (!error && inserted) {
       revalidatePath("/admin/properties");
+      revalidatePath("/admin/agents");
+      revalidatePath("/agent/properties");
       revalidatePath("/");
       return { ...SUCCESS, id: inserted.id, slug: inserted.slug };
     }
@@ -110,7 +188,8 @@ export async function updateProperty(
   id: string,
   input: PropertyFormInput,
 ): Promise<PropertyActionState> {
-  const supabase = await requireUser();
+  const { supabase, user } = await requireUser();
+  const role = await getDashboardRole(supabase, user.id);
 
   const parsed = propertyFormSchema.safeParse(input);
   if (!parsed.success) {
@@ -121,46 +200,136 @@ export async function updateProperty(
   }
 
   const data = parsed.data;
+
+  const basePayload = {
+    title: data.title,
+    status: data.status,
+    property_type: data.property_type,
+    listing_type: data.listing_type,
+    price: data.price,
+    address: data.address || null,
+    suburb: data.suburb,
+    city: data.city,
+    province: data.province,
+    is_gated_community: data.is_gated_community,
+    gated_community_name: data.gated_community_name || null,
+    bedrooms: data.bedrooms,
+    bathrooms: data.bathrooms,
+    garages: data.garages,
+    parking_spaces: data.parking_spaces,
+    floor_size_sqm: data.floor_size_sqm ?? null,
+    erf_size_sqm: data.erf_size_sqm ?? null,
+    year_built: data.year_built ?? null,
+    features: data.features,
+    manual_description: data.manual_description || null,
+    ai_description: data.ai_description || null,
+    ai_seo_title: data.ai_seo_title || null,
+    ai_seo_description: data.ai_seo_description || null,
+    ai_neighbourhood_summary: data.ai_neighbourhood_summary || null,
+    ai_headline: data.ai_headline || null,
+    ai_cta: data.ai_cta || null,
+    agent_name: data.agent_name || null,
+    agent_phone: data.agent_phone || null,
+    agent_email: data.agent_email || null,
+    agent_photo_url: data.agent_photo_url || null,
+  };
+
+  let assignedPatch: { assigned_user_id: string | null } | Record<string, never> =
+    {};
+  if (role === "admin") {
+    const uid = data.assigned_user_id?.trim();
+    if (uid) {
+      const { data: acct } = await supabase
+        .from("agent_accounts")
+        .select("user_id")
+        .eq("user_id", uid)
+        .maybeSingle();
+      if (!acct) {
+        return {
+          ok: false,
+          error: "Selected agent is invalid or no longer exists.",
+          fieldErrors: {
+            assigned_user_id: "Pick a valid agent or leave unassigned.",
+          },
+        };
+      }
+      assignedPatch = { assigned_user_id: uid };
+    } else {
+      const assignEmail = data.assigned_agent_email?.trim();
+      if (assignEmail) {
+        const resolved = await resolveUserIdByEmail(assignEmail);
+        if (!resolved) {
+          return {
+            ok: false,
+            error: "No dashboard user found with that assigned agent email.",
+            fieldErrors: {
+              assigned_agent_email: "Check the login email and try again.",
+            },
+          };
+        }
+        const { data: acct } = await supabase
+          .from("agent_accounts")
+          .select("user_id")
+          .eq("user_id", resolved)
+          .maybeSingle();
+        if (!acct) {
+          return {
+            ok: false,
+            error: "That user is not registered as an agent.",
+            fieldErrors: {
+              assigned_agent_email:
+                "Create an agent account first under Agents.",
+            },
+          };
+        }
+        assignedPatch = { assigned_user_id: resolved };
+      } else {
+        assignedPatch = { assigned_user_id: null };
+      }
+    }
+  }
+
+  let sourcedPatch: { sourced_by_user_id: string | null } | Record<string, never> =
+    {};
+  if (role === "admin") {
+    const sid = data.sourced_by_user_id?.trim();
+    if (sid) {
+      const { data: srcAcct } = await supabase
+        .from("agent_accounts")
+        .select("user_id")
+        .eq("user_id", sid)
+        .maybeSingle();
+      if (!srcAcct) {
+        return {
+          ok: false,
+          error: "Selected sourcing agent is invalid or no longer exists.",
+          fieldErrors: {
+            sourced_by_user_id: "Pick a valid agent or leave unassigned.",
+          },
+        };
+      }
+      sourcedPatch = { sourced_by_user_id: sid };
+    } else {
+      sourcedPatch = { sourced_by_user_id: null };
+    }
+  }
+
   const { error } = await supabase
     .from("properties")
     .update({
-      title: data.title,
-      status: data.status,
-      property_type: data.property_type,
-      listing_type: data.listing_type,
-      price: data.price,
-      address: data.address || null,
-      suburb: data.suburb,
-      city: data.city,
-      province: data.province,
-      is_gated_community: data.is_gated_community,
-      gated_community_name: data.gated_community_name || null,
-      bedrooms: data.bedrooms,
-      bathrooms: data.bathrooms,
-      garages: data.garages,
-      parking_spaces: data.parking_spaces,
-      floor_size_sqm: data.floor_size_sqm ?? null,
-      erf_size_sqm: data.erf_size_sqm ?? null,
-      year_built: data.year_built ?? null,
-      features: data.features,
-      manual_description: data.manual_description || null,
-      ai_description: data.ai_description || null,
-      ai_seo_title: data.ai_seo_title || null,
-      ai_seo_description: data.ai_seo_description || null,
-      ai_neighbourhood_summary: data.ai_neighbourhood_summary || null,
-      ai_headline: data.ai_headline || null,
-      ai_cta: data.ai_cta || null,
-      agent_name: data.agent_name || null,
-      agent_phone: data.agent_phone || null,
-      agent_email: data.agent_email || null,
-      agent_photo_url: data.agent_photo_url || null,
+      ...basePayload,
+      ...assignedPatch,
+      ...sourcedPatch,
     })
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/admin/properties");
+  revalidatePath("/admin/agents");
+  revalidatePath("/agent/properties");
   revalidatePath(`/admin/properties/${id}/edit`);
+  revalidatePath(`/agent/properties/${id}/edit`);
   revalidatePath("/");
   return SUCCESS;
 }
@@ -169,7 +338,7 @@ export async function setPropertyStatus(
   id: string,
   status: "draft" | "published" | "sold",
 ): Promise<PropertyActionState> {
-  const supabase = await requireUser();
+  const { supabase } = await requireUser();
   const updates: { status: typeof status; published_at?: string } = { status };
   if (status === "published") {
     updates.published_at = new Date().toISOString();
@@ -180,14 +349,19 @@ export async function setPropertyStatus(
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/properties");
+  revalidatePath("/admin/agents");
+  revalidatePath("/agent/properties");
   revalidatePath("/");
   return SUCCESS;
 }
 
 export async function deleteProperty(id: string): Promise<void> {
-  const supabase = await requireUser();
+  const { supabase, user } = await requireUser();
+  await assertDashboardAdmin(supabase, user.id);
   await supabase.from("properties").delete().eq("id", id);
   revalidatePath("/admin/properties");
+  revalidatePath("/admin/agents");
+  revalidatePath("/agent/properties");
   revalidatePath("/");
   redirect("/admin/properties");
 }
@@ -196,7 +370,7 @@ export async function markLeadContacted(
   id: string,
   contacted: boolean,
 ): Promise<PropertyActionState> {
-  const supabase = await requireUser();
+  const { supabase } = await requireUser();
   const { error } = await supabase
     .from("leads")
     .update({
@@ -206,5 +380,6 @@ export async function markLeadContacted(
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/leads");
+  revalidatePath("/agent/leads");
   return SUCCESS;
 }

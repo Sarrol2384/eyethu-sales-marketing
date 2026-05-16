@@ -9,7 +9,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-export function LoginForm({ redirectTo }: { redirectTo: string }) {
+function safeAuthRedirect(candidate: string, fallback: string): string {
+  if (
+    !candidate.startsWith("/") ||
+    candidate.includes("//") ||
+    candidate.includes(":")
+  ) {
+    return fallback;
+  }
+  if (candidate === "/admin/login" || candidate === "/agent/login") {
+    return fallback;
+  }
+  if (candidate.startsWith("/admin/") || candidate === "/admin") {
+    return candidate;
+  }
+  if (candidate.startsWith("/agent/") || candidate === "/agent") {
+    return candidate;
+  }
+  return fallback;
+}
+
+export function LoginForm({
+  redirectTo,
+  redirectFallback = "/admin",
+}: {
+  redirectTo: string;
+  /** Used when redirectTo is missing or not an allowed internal path. */
+  redirectFallback?: string;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,10 +56,22 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         return;
       }
       toast.success("Welcome back!");
-      const safeRedirect =
-        redirectTo.startsWith("/admin") ? redirectTo : "/admin";
-      router.replace(safeRedirect);
+      router.replace(safeAuthRedirect(redirectTo, redirectFallback));
       router.refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isNetwork =
+        err instanceof TypeError ||
+        msg === "Failed to fetch" ||
+        msg.toLowerCase().includes("fetch");
+      if (isNetwork) {
+        toast.error(
+          "Cannot reach Supabase. Check NEXT_PUBLIC_SUPABASE_URL is https://your-project.supabase.co (no spaces or quotes), use the anon JWT from Settings → API, save .env.local, restart npm run dev, and try turning off VPN/ad blockers.",
+          { duration: 12_000 },
+        );
+        return;
+      }
+      toast.error(msg || "Sign-in failed");
     } finally {
       setLoading(false);
     }

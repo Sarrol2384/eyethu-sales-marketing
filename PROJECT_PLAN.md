@@ -10,7 +10,7 @@ AI-powered property listing platform for **Eyethu Property Group**, a Cape Town 
 - **React 19**
 - **Tailwind CSS v4** (CSS-first config via `@theme` in `app/globals.css`)
 - **shadcn/ui** (radix-nova preset, neutral base, Lucide icons)
-- **Supabase** — database, auth, storage. Local dev via Supabase CLI + Docker; remote project for production.
+- **Supabase** — database, auth, storage. **Cloud dev** against [supabase.com](https://supabase.com) is the default (no Docker); see `docs/SUPABASE_CLOUD_SETUP.md`. Optional local stack via Supabase CLI + Docker.
 - **Claude API** (`@anthropic-ai/sdk`) — AI content generation + lead scoring summaries
 - **Brevo** (`@getbrevo/brevo`) — transactional email, SMS, contacts
 - **Cal.com API v2** — viewing bookings (phase 10+)

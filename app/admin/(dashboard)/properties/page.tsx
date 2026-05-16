@@ -31,6 +31,7 @@ type Row = {
   bedrooms: number;
   bathrooms: number;
   updated_at: string;
+  sourced_by_user_id: string | null;
   property_images: Array<{
     image_url: string;
     is_primary: boolean;
@@ -45,12 +46,32 @@ export default async function PropertiesListPage() {
   const { data } = await supabase
     .from("properties")
     .select(
-      `id, title, slug, suburb, status, property_type, price, bedrooms, bathrooms, updated_at,
+      `id, title, slug, suburb, status, property_type, price, bedrooms, bathrooms, updated_at, sourced_by_user_id,
        property_images ( image_url, is_primary, display_order )`,
     )
     .order("updated_at", { ascending: false });
 
   const rows = (data ?? []) as unknown as Row[];
+
+  const sourcedIds = [
+    ...new Set(
+      rows
+        .map((r) => r.sourced_by_user_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const sourcingLabelByUserId = new Map<string, string>();
+  if (sourcedIds.length > 0) {
+    const { data: sourcingAgents } = await supabase
+      .from("agent_accounts")
+      .select("user_id, display_name, email")
+      .in("user_id", sourcedIds);
+    for (const a of sourcingAgents ?? []) {
+      const label =
+        a.display_name?.trim() || a.email?.trim() || a.user_id.slice(0, 8);
+      sourcingLabelByUserId.set(a.user_id, label);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -89,6 +110,7 @@ export default async function PropertiesListPage() {
               <TableRow>
                 <TableHead className="w-[60px]"></TableHead>
                 <TableHead>Title</TableHead>
+                <TableHead className="hidden md:table-cell">Sourcing</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead className="text-right">Price</TableHead>
@@ -127,6 +149,12 @@ export default async function PropertiesListPage() {
                       <div className="text-xs text-muted-foreground">
                         {row.suburb} · {row.bedrooms} bed, {row.bathrooms} bath
                       </div>
+                    </TableCell>
+                    <TableCell className="hidden max-w-[10rem] truncate text-sm text-muted-foreground md:table-cell">
+                      {row.sourced_by_user_id
+                        ? (sourcingLabelByUserId.get(row.sourced_by_user_id) ??
+                          "—")
+                        : "—"}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={row.status} />

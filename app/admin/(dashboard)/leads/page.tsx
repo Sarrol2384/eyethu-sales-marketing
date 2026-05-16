@@ -2,6 +2,10 @@ import { Users } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { LeadsTable, type AdminLead } from "@/components/admin/LeadsTable";
 
+type RawLead = Omit<AdminLead, "attributed_agent_label"> & {
+  attributed_agent_user_id: string | null;
+};
+
 export const dynamic = "force-dynamic";
 
 export default async function LeadsPage({
@@ -19,7 +23,7 @@ export default async function LeadsPage({
   let query = supabase.from("leads").select(
     `id, full_name, phone, email, message, is_first_time_buyer,
      move_timeline, lead_score, lead_category, ai_summary,
-     contacted, contacted_at, created_at,
+     contacted, contacted_at, created_at, attributed_agent_user_id,
      properties:property_id ( id, title, slug, suburb )`,
   );
 
@@ -30,7 +34,36 @@ export default async function LeadsPage({
   }
 
   const { data } = await query.limit(500);
-  const leads = (data ?? []) as unknown as AdminLead[];
+  const rawLeads = (data ?? []) as unknown as RawLead[];
+
+  // Resolve attributed agent names in one query.
+  const attributedIds = [
+    ...new Set(
+      rawLeads
+        .map((l) => l.attributed_agent_user_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const agentLabelMap = new Map<string, string>();
+  if (attributedIds.length > 0) {
+    const { data: agentRows } = await supabase
+      .from("agent_accounts")
+      .select("user_id, display_name, email")
+      .in("user_id", attributedIds);
+    for (const a of agentRows ?? []) {
+      agentLabelMap.set(
+        a.user_id,
+        a.display_name?.trim() || a.email?.trim() || a.user_id.slice(0, 8),
+      );
+    }
+  }
+
+  const leads: AdminLead[] = rawLeads.map((l) => ({
+    ...l,
+    attributed_agent_label: l.attributed_agent_user_id
+      ? (agentLabelMap.get(l.attributed_agent_user_id) ?? null)
+      : null,
+  }));
 
   return (
     <div className="space-y-6">
