@@ -17,9 +17,17 @@ type Props = {
   headline: string;
   priceLabel: string;
   suburb: string;
+  /** "clean" = photo-only hero; headline/price live in sidebar. Default "overlay". */
+  layout?: "overlay" | "clean";
 };
 
-export function PropertyHero({ images, headline, priceLabel, suburb }: Props) {
+export function PropertyHero({
+  images,
+  headline,
+  priceLabel,
+  suburb,
+  layout = "overlay",
+}: Props) {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: images.length > 1 });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -45,15 +53,18 @@ export function PropertyHero({ images, headline, priceLabel, suburb }: Props) {
 
   if (images.length === 0) {
     return (
-      <div className="relative flex aspect-[4/3] w-full items-center justify-center rounded-2xl border bg-muted text-muted-foreground sm:aspect-[16/9]">
+      <div className="relative flex aspect-[4/3] w-full items-center justify-center rounded-2xl border bg-muted text-muted-foreground sm:aspect-[16/9] lg:rounded-3xl">
         No photos yet
       </div>
     );
   }
 
+  const frameRounded =
+    layout === "clean" ? "rounded-3xl" : "rounded-2xl";
+
   return (
     <div className="space-y-3">
-      <div className="relative overflow-hidden rounded-2xl bg-muted">
+      <div className={`relative overflow-hidden bg-muted ${frameRounded}`}>
         <div ref={emblaRef} className="overflow-hidden">
           <div className="flex">
             {images.map((img, i) => (
@@ -79,18 +90,25 @@ export function PropertyHero({ images, headline, priceLabel, suburb }: Props) {
           </div>
         </div>
 
-        {/* Overlay (mobile bottom, desktop top-left) */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4 text-white sm:p-6">
-          <h1 className="text-balance text-2xl font-semibold leading-tight drop-shadow sm:text-4xl">
-            {headline}
-          </h1>
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm sm:text-base">
-            <span className="text-xl font-semibold tabular-nums sm:text-2xl">
-              {priceLabel}
+        {layout === "clean" ? (
+          <div className="pointer-events-none absolute left-4 top-4 sm:left-5 sm:top-5">
+            <span className="inline-flex items-center rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur-sm sm:text-sm">
+              {suburb}
             </span>
-            <span className="text-white/85">· {suburb}</span>
           </div>
-        </div>
+        ) : (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4 text-white sm:p-6">
+            <h1 className="text-balance text-2xl font-semibold leading-tight drop-shadow sm:text-4xl">
+              {headline}
+            </h1>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm sm:text-base">
+              <span className="text-xl font-semibold tabular-nums sm:text-2xl">
+                {priceLabel}
+              </span>
+              <span className="text-white/85">· {suburb}</span>
+            </div>
+          </div>
+        )}
 
         {images.length > 1 && (
           <>
@@ -133,14 +151,14 @@ export function PropertyHero({ images, headline, priceLabel, suburb }: Props) {
       </div>
 
       {images.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {images.map((img, i) => (
             <button
               key={`thumb-${img.url}-${i}`}
               type="button"
               onClick={() => scrollTo(i)}
               aria-label={`Show photo ${i + 1}`}
-              className={`relative aspect-[4/3] h-16 shrink-0 overflow-hidden rounded-md border-2 transition ${
+              className={`relative aspect-[4/3] h-16 shrink-0 overflow-hidden rounded-xl border-2 transition ${
                 i === selectedIndex
                   ? "border-primary"
                   : "border-transparent opacity-70 hover:opacity-100"
@@ -155,6 +173,16 @@ export function PropertyHero({ images, headline, priceLabel, suburb }: Props) {
               />
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => {
+              setLightboxIndex(selectedIndex);
+              setLightboxOpen(true);
+            }}
+            className="flex h-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/50 px-3 text-xs font-medium text-muted-foreground transition hover:border-primary/40 hover:bg-muted hover:text-foreground"
+          >
+            View all
+          </button>
         </div>
       )}
 

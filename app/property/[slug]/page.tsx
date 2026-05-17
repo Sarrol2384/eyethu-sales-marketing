@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { getPropertyBySlug } from "@/lib/properties/queries";
 import { formatZAR } from "@/lib/format/currency";
+import {
+  calculateBond,
+  SA_PRIME_RATE_DEFAULT,
+} from "@/lib/bond/calculator";
 import { PropertyHero } from "@/components/property/PropertyHero";
-import { PropertyDetails } from "@/components/property/PropertyDetails";
+import { PropertyListingSummary } from "@/components/property/PropertyListingSummary";
 import { PropertyDescription } from "@/components/property/PropertyDescription";
 import { PropertyFeatures } from "@/components/property/PropertyFeatures";
 import { NeighbourhoodInfo } from "@/components/property/NeighbourhoodInfo";
 import { BondCalculator } from "@/components/property/BondCalculator";
-import { LeadCaptureForm } from "@/components/property/LeadCaptureForm";
-import { AgentCard } from "@/components/property/AgentCard";
-import { ShareButtons } from "@/components/property/ShareButtons";
 import { ViewTracker } from "@/components/property/ViewTracker";
 import { StaffSignInLinks } from "@/components/public/StaffSignInLinks";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -105,6 +105,23 @@ export default async function PropertyPage({ params }: PageProps) {
     alt: img.alt_text ?? property.title,
   }));
 
+  const priceNum = Number(property.price);
+  const bondTeaser =
+    property.listing_type === "sale" && priceNum > 0
+      ? calculateBond({
+          price: priceNum,
+          depositAmount: Math.round(priceNum * 0.1),
+          annualRatePercent: SA_PRIME_RATE_DEFAULT,
+          termYears: 20,
+        })
+      : null;
+  const monthlyBondEstimateLabel =
+    bondTeaser && bondTeaser.monthlyPayment > 0
+      ? `≈ ${formatZAR(Math.round(bondTeaser.monthlyPayment))} p/m bond`
+      : null;
+
+  const addressLine = formatPropertyAddressLine(property);
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-4 sm:px-6 sm:pt-6">
       <ViewTracker propertyId={property.id} />
@@ -116,40 +133,47 @@ export default async function PropertyPage({ params }: PageProps) {
         / <span className="text-foreground">{property.suburb}</span>
       </nav>
 
-      <PropertyHero
-        images={images}
-        headline={headline}
-        priceLabel={priceLabel}
-        suburb={property.suburb}
-      />
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:items-start lg:gap-x-8">
+        <div className="lg:col-start-1 lg:row-start-1">
+          <PropertyHero
+            layout="clean"
+            images={images}
+            headline={headline}
+            priceLabel={priceLabel}
+            suburb={property.suburb}
+          />
+        </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        <Badge variant="secondary" className="capitalize">
-          {property.property_type}
-        </Badge>
-        <Badge variant="secondary" className="capitalize">
-          For {property.listing_type}
-        </Badge>
-        {property.is_gated_community && (
-          <Badge className="bg-primary/10 text-primary hover:bg-primary/15">
-            Gated community
-            {property.gated_community_name
-              ? ` · ${property.gated_community_name}`
-              : ""}
-          </Badge>
-        )}
-      </div>
-
-      <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_360px]">
-        <div className="space-y-10">
-          <PropertyDetails
+        <div className="mt-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:sticky lg:top-6 lg:self-start">
+          <PropertyListingSummary
+            headline={headline}
+            propertyType={property.property_type}
+            listingType={property.listing_type}
+            isGatedCommunity={property.is_gated_community}
+            gatedCommunityName={property.gated_community_name}
+            priceLabel={priceLabel}
+            monthlyBondEstimateLabel={monthlyBondEstimateLabel}
             bedrooms={property.bedrooms}
             bathrooms={property.bathrooms}
             garages={property.garages}
             floorSizeSqm={property.floor_size_sqm}
             erfSizeSqm={property.erf_size_sqm}
+            addressLine={addressLine}
+            propertyId={property.id}
+            propertyTitle={property.title}
+            cta={property.ai_cta ?? "Book a viewing"}
+            agentName={property.agent_name}
+            agentPhone={property.agent_phone}
+            agentEmail={property.agent_email}
+            agentPhotoUrl={property.agent_photo_url}
+            propertyUrl={propertyUrl}
+            sharePriceLabel={priceLabel}
+            suburb={property.suburb}
+            referralUserId={shareReferralUserId}
           />
+        </div>
 
+        <div className="mt-8 space-y-10 lg:col-start-1 lg:row-start-2 lg:mt-8">
           <PropertyDescription
             description={property.ai_description}
             fallback={property.manual_description}
@@ -157,41 +181,14 @@ export default async function PropertyPage({ params }: PageProps) {
 
           <PropertyFeatures features={property.features} />
 
-          <BondCalculator price={Number(property.price)} />
+          <div id="bond-calculator">
+            <BondCalculator price={priceNum} />
+          </div>
 
           <NeighbourhoodInfo
             suburb={property.suburb}
             city={property.city}
             summary={property.ai_neighbourhood_summary}
-          />
-
-          <section className="space-y-3">
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Share this home
-            </h2>
-            <ShareButtons
-              url={propertyUrl}
-              title={property.title}
-              price={priceLabel}
-              suburb={property.suburb}
-              referralUserId={shareReferralUserId}
-            />
-          </section>
-        </div>
-
-        <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
-          <LeadCaptureForm
-            propertyId={property.id}
-            propertyTitle={property.title}
-            cta={property.ai_cta ?? "Book a viewing"}
-          />
-          <AgentCard
-            name={property.agent_name}
-            phone={property.agent_phone}
-            email={property.agent_email}
-            photoUrl={property.agent_photo_url}
-            propertyTitle={property.title}
-            propertyUrl={propertyUrl}
           />
         </div>
       </div>
@@ -201,6 +198,18 @@ export default async function PropertyPage({ params }: PageProps) {
       </footer>
     </main>
   );
+}
+
+function formatPropertyAddressLine(property: {
+  address: string | null;
+  suburb: string;
+  city: string;
+}): string | null {
+  const trimmed = property.address?.trim();
+  if (trimmed) {
+    return `${trimmed}, ${property.suburb}, ${property.city}`;
+  }
+  return `${property.suburb}, ${property.city}`;
 }
 
 function propertyTypeLabel(t: string): string {
