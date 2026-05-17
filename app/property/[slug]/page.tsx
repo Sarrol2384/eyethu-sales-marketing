@@ -14,6 +14,7 @@ import { LeadCaptureForm } from "@/components/property/LeadCaptureForm";
 import { AgentCard } from "@/components/property/AgentCard";
 import { ShareButtons } from "@/components/property/ShareButtons";
 import { ViewTracker } from "@/components/property/ViewTracker";
+import { StaffSignInLinks } from "@/components/public/StaffSignInLinks";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getDashboardRole } from "@/lib/auth/dashboard-access";
 
@@ -194,6 +195,10 @@ export default async function PropertyPage({ params }: PageProps) {
           />
         </div>
       </div>
+
+      <footer className="mt-16 border-t pt-8">
+        <StaffSignInLinks />
+      </footer>
     </main>
   );
 }

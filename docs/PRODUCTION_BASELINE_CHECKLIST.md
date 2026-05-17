@@ -2,6 +2,8 @@
 
 Complete this **before** shipping deferred phases (AI lead layer, crons, Cal.com). Tick items in your deploy runbook or PR template.
 
+**Hosting on Vercel:** follow **[VERCEL_DEPLOY.md](./VERCEL_DEPLOY.md)** (GitHub import, `NEXT_PUBLIC_SITE_URL`, env vars, redeploy).
+
 ## Supabase database
 
 - [ ] All migrations applied **in filename order** on the **production** project (SQL Editor or `supabase db push`):

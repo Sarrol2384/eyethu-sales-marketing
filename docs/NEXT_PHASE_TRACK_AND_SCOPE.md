@@ -1,6 +1,6 @@
 # Next phase track and scope
 
-After [production baseline](./PRODUCTION_BASELINE_CHECKLIST.md) is green, implement **one** vertical at a time (per [PROJECT_PLAN.md](../PROJECT_PLAN.md) deferred work).
+After [production baseline](./PRODUCTION_BASELINE_CHECKLIST.md) is green, implement **one** vertical at a time (per [PROJECT_PLAN.md](../PROJECT_PLAN.md) deferred work). For hosting, see [VERCEL_DEPLOY.md](./VERCEL_DEPLOY.md).
 
 ## Chosen track (default recommendation)
 

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Image from "next/image";
 import { Home, MapPin } from "lucide-react";
+import { StaffSignInLinks } from "@/components/public/StaffSignInLinks";
 import { FilterBar } from "@/components/home/FilterBar";
 import { PropertyCard } from "@/components/home/PropertyCard";
 import {
@@ -108,6 +109,7 @@ export default async function HomePage({
         <p className="text-xs text-muted-foreground">
           MJG Real Estate T/A Eyethu Property Group · Cape Town · Western Cape
         </p>
+        <StaffSignInLinks />
       </footer>
     </main>
   );
