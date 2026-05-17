@@ -42,7 +42,9 @@ export function PropertyFeatures({ features }: Props) {
   if (!features.length) return null;
   return (
     <section className="space-y-3">
-      <h2 className="text-2xl font-semibold tracking-tight">Features</h2>
+      <h2 className="font-heading text-2xl font-semibold tracking-tight">
+        Features
+      </h2>
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {features.map((f) => {
           const Icon = iconForFeature(f);

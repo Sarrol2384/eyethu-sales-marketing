@@ -6,6 +6,10 @@ import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+/** Max cells in the gallery grid (thumbnails + optional "+N" tile). */
+const GALLERY_GRID_MAX_CELLS = 8;
 
 export type HeroImage = {
   url: string;
@@ -62,6 +66,14 @@ export function PropertyHero({
   const frameRounded =
     layout === "clean" ? "rounded-3xl" : "rounded-2xl";
 
+  const restImages = images.slice(1);
+  const showGalleryGrid = restImages.length > 0;
+  const useMoreTile = restImages.length > 7;
+  const gridThumbs = useMoreTile
+    ? restImages.slice(0, GALLERY_GRID_MAX_CELLS - 1)
+    : restImages;
+  const hiddenRestCount = restImages.length - gridThumbs.length;
+
   return (
     <div className="space-y-3">
       <div className={`relative overflow-hidden bg-muted ${frameRounded}`}>
@@ -98,14 +110,14 @@ export function PropertyHero({
           </div>
         ) : (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4 text-white sm:p-6">
-            <h1 className="text-balance text-2xl font-semibold leading-tight drop-shadow sm:text-4xl">
+            <h1 className="font-heading text-balance text-2xl font-semibold leading-tight drop-shadow sm:text-4xl">
               {headline}
             </h1>
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm sm:text-base">
-              <span className="text-xl font-semibold tabular-nums sm:text-2xl">
+              <span className="font-heading text-xl font-semibold tabular-nums sm:text-2xl">
                 {priceLabel}
               </span>
-              <span className="text-white/85">· {suburb}</span>
+              <span className="font-sans text-white/85">· {suburb}</span>
             </div>
           </div>
         )}
@@ -150,39 +162,51 @@ export function PropertyHero({
         )}
       </div>
 
-      {images.length > 1 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {images.map((img, i) => (
+      {showGalleryGrid && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {gridThumbs.map((img, gridIdx) => {
+            const i = gridIdx + 1;
+            return (
+              <button
+                key={`grid-${img.url}-${i}`}
+                type="button"
+                onClick={() => scrollTo(i)}
+                aria-label={`Show photo ${i + 1}`}
+                aria-current={i === selectedIndex ? "true" : undefined}
+                className={cn(
+                  "relative aspect-[4/3] overflow-hidden rounded-xl border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  i === selectedIndex
+                    ? "border-primary ring-2 ring-primary/20"
+                    : "border-transparent hover:opacity-90",
+                )}
+              >
+                <Image
+                  src={img.url}
+                  alt=""
+                  fill
+                  sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 22vw"
+                  className="object-cover"
+                />
+              </button>
+            );
+          })}
+          {useMoreTile && hiddenRestCount > 0 ? (
             <button
-              key={`thumb-${img.url}-${i}`}
               type="button"
-              onClick={() => scrollTo(i)}
-              aria-label={`Show photo ${i + 1}`}
-              className={`relative aspect-[4/3] h-16 shrink-0 overflow-hidden rounded-xl border-2 transition ${
-                i === selectedIndex
-                  ? "border-primary"
-                  : "border-transparent opacity-70 hover:opacity-100"
-              }`}
+              onClick={() => {
+                setLightboxIndex(selectedIndex);
+                setLightboxOpen(true);
+              }}
+              className="relative flex aspect-[4/3] flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/60 text-center transition hover:border-primary/40 hover:bg-muted"
             >
-              <Image
-                src={img.url}
-                alt=""
-                fill
-                sizes="120px"
-                className="object-cover"
-              />
+              <span className="text-lg font-semibold tabular-nums text-foreground">
+                +{hiddenRestCount}
+              </span>
+              <span className="mt-0.5 px-2 text-xs font-medium text-muted-foreground">
+                View all photos
+              </span>
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => {
-              setLightboxIndex(selectedIndex);
-              setLightboxOpen(true);
-            }}
-            className="flex h-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/50 px-3 text-xs font-medium text-muted-foreground transition hover:border-primary/40 hover:bg-muted hover:text-foreground"
-          >
-            View all
-          </button>
+          ) : null}
         </div>
       )}
 

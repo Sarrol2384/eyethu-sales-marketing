@@ -89,10 +89,10 @@ export function PropertyListingSummary({
             />
             <span className="capitalize">{statusText}</span>
           </p>
-          <h1 className="mt-2 text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+          <h1 className="font-heading mt-2 text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
             {headline}
           </h1>
-          <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight sm:text-4xl">
+          <p className="font-heading mt-2 text-3xl font-semibold tabular-nums tracking-tight sm:text-4xl">
             {priceLabel}
           </p>
           {monthlyBondEstimateLabel ? (

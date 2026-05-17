@@ -8,7 +8,7 @@ export function PropertyDescription({ description, fallback }: Props) {
   if (!text) return null;
   return (
     <section className="space-y-3">
-      <h2 className="text-2xl font-semibold tracking-tight">
+      <h2 className="font-heading text-2xl font-semibold tracking-tight">
         About this home
       </h2>
       <div className="space-y-3 text-base leading-relaxed text-foreground/90">
