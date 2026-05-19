@@ -14,18 +14,24 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { PropertyRowActions } from "@/components/admin/PropertyRowActions";
+import { CommissionSummaryCards } from "@/components/admin/CommissionSummaryCards";
+import { PropertyCommissionCell } from "@/components/admin/PropertyCommissionCell";
+import {
+  buildAgentDefaultsMap,
+  getAgentCommissionDisplay,
+  sumAgentCommissions,
+  type CommissionListing,
+} from "@/lib/commission/calculate";
 import { formatZAR } from "@/lib/format/currency";
 import { formatRelative } from "@/lib/format/date";
-import type { PropertyStatus, PropertyType } from "@/lib/supabase/types";
+import type { PropertyType } from "@/lib/supabase/types";
 
-type Row = {
+type Row = CommissionListing & {
   id: string;
   title: string;
   slug: string;
   suburb: string;
-  status: PropertyStatus;
   property_type: PropertyType;
-  price: number;
   bedrooms: number;
   bathrooms: number;
   updated_at: string;
@@ -45,28 +51,55 @@ export default async function AgentPropertiesPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/agent/login");
 
-  const { data } = await supabase
-    .from("properties")
-    .select(
-      `id, title, slug, suburb, status, property_type, price, bedrooms, bathrooms, updated_at,
-       property_images ( image_url, is_primary, display_order )`,
-    )
-    .or(
-      `assigned_user_id.eq.${user.id},sourced_by_user_id.eq.${user.id}`,
-    )
-    .order("updated_at", { ascending: false });
+  const [{ data: agentRow }, { data }] = await Promise.all([
+    supabase
+      .from("agent_accounts")
+      .select("default_commission_percent")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("properties")
+      .select(
+        `id, title, slug, suburb, status, property_type, listing_type, price, sold_price,
+         commission_percent, commission_amount, assigned_user_id, sourced_by_user_id,
+         bedrooms, bathrooms, updated_at,
+         property_images ( image_url, is_primary, display_order )`,
+      )
+      .or(
+        `assigned_user_id.eq.${user.id},sourced_by_user_id.eq.${user.id}`,
+      )
+      .order("updated_at", { ascending: false }),
+  ]);
 
   const rows = (data ?? []) as unknown as Row[];
+  const agentDefaults = buildAgentDefaultsMap([
+    {
+      user_id: user.id,
+      default_commission_percent:
+        (agentRow as { default_commission_percent?: number | null } | null)
+          ?.default_commission_percent ?? null,
+    },
+  ]);
+  const totals = sumAgentCommissions(rows, user.id, agentDefaults);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">My properties</h1>
-          <p className="text-sm text-muted-foreground">
-            {rows.length} listing{rows.length === 1 ? "" : "s"} you manage or
-            sourced (mandated).
-          </p>
+        <p className="text-sm text-muted-foreground">
+          {rows.length} listing{rows.length === 1 ? "" : "s"} you manage or
+          sourced (mandated).
+          {agentRow?.default_commission_percent != null && (
+            <>
+              {" "}
+              Default commission: {agentRow.default_commission_percent}% of sale
+              price.
+            </>
+          )}
+        </p>
       </div>
+
+      {rows.length > 0 && <CommissionSummaryCards totals={totals} />}
 
       {rows.length === 0 ? (
         <div className="rounded-2xl border border-dashed bg-card p-12 text-center">
@@ -86,6 +119,7 @@ export default async function AgentPropertiesPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-right">Commission</TableHead>
                 <TableHead className="hidden sm:table-cell">Updated</TableHead>
                 <TableHead className="w-[100px] text-right">Actions</TableHead>
               </TableRow>
@@ -97,6 +131,11 @@ export default async function AgentPropertiesPage() {
                   row.property_images.sort(
                     (a, b) => a.display_order - b.display_order,
                   )[0];
+                const commissionDisplay = getAgentCommissionDisplay(
+                  row,
+                  user.id,
+                  agentDefaults,
+                );
                 return (
                   <TableRow key={row.id}>
                     <TableCell>
@@ -130,6 +169,9 @@ export default async function AgentPropertiesPage() {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatZAR(Number(row.price))}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <PropertyCommissionCell display={commissionDisplay} />
                     </TableCell>
                     <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
                       {formatRelative(row.updated_at)}

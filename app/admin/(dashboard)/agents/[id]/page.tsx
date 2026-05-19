@@ -13,27 +13,31 @@ import {
 } from "@/components/ui/table";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/admin/StatusBadge";
+import { AgentCommissionSettings } from "@/components/admin/AgentCommissionSettings";
+import { CommissionSummaryCards } from "@/components/admin/CommissionSummaryCards";
+import { PropertyCommissionCell } from "@/components/admin/PropertyCommissionCell";
+import { fetchAgentByIdForAdmin } from "@/lib/agents/fetch-agent-roster";
+import {
+  buildAgentDefaultsMap,
+  getAgentCommissionDisplay,
+  sumAgentCommissions,
+  type CommissionListing,
+} from "@/lib/commission/calculate";
 import { formatZAR } from "@/lib/format/currency";
 import { formatRelative } from "@/lib/format/date";
-import type {
-  AgentAccountRow,
-  PropertyStatus,
-  PropertyType,
-} from "@/lib/supabase/types";
+import type { PropertyType } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-type Row = {
+type Row = CommissionListing & {
   id: string;
   title: string;
   slug: string;
   suburb: string;
-  status: PropertyStatus;
   property_type: PropertyType;
-  price: number;
   bedrooms: number;
   bathrooms: number;
   updated_at: string;
@@ -53,23 +57,16 @@ export default async function AdminAgentPreviewPage({ params }: PageProps) {
   if (!UUID_RE.test(id)) notFound();
 
   const supabase = await createSupabaseServerClient();
-  const { data: agent } = await supabase
-    .from("agent_accounts")
-    .select("user_id, display_name, email, phone")
-    .eq("user_id", id)
-    .maybeSingle();
+  const agentRow = await fetchAgentByIdForAdmin(id);
 
-  if (!agent) notFound();
-
-  const agentRow = agent as Pick<
-    AgentAccountRow,
-    "user_id" | "display_name" | "email" | "phone"
-  >;
+  if (!agentRow) notFound();
 
   const { data } = await supabase
     .from("properties")
     .select(
-      `id, title, slug, suburb, status, property_type, price, bedrooms, bathrooms, updated_at,
+      `id, title, slug, suburb, status, property_type, listing_type, price, sold_price,
+       commission_percent, commission_amount, assigned_user_id, sourced_by_user_id,
+       bedrooms, bathrooms, updated_at,
        property_images ( image_url, is_primary, display_order )`,
     )
     .or(`assigned_user_id.eq.${id},sourced_by_user_id.eq.${id}`)
@@ -78,6 +75,8 @@ export default async function AdminAgentPreviewPage({ params }: PageProps) {
   const rows = (data ?? []) as unknown as Row[];
   const label =
     agentRow.display_name ?? agentRow.email ?? agentRow.user_id;
+  const agentDefaults = buildAgentDefaultsMap([agentRow]);
+  const totals = sumAgentCommissions(rows, id, agentDefaults);
 
   return (
     <div className="space-y-6">
@@ -95,10 +94,23 @@ export default async function AdminAgentPreviewPage({ params }: PageProps) {
         </h1>
         <p className="text-sm text-muted-foreground">
           {rows.length} listing{rows.length === 1 ? "" : "s"} this agent manages
-          or sourced. This is an admin preview — edits open in the full admin
-          editor.
+          or sourced.
+          {agentRow.default_commission_percent != null && (
+            <>
+              {" "}
+              Default commission: {agentRow.default_commission_percent}% of sale
+              price.
+            </>
+          )}
         </p>
       </div>
+
+      <AgentCommissionSettings
+        userId={agentRow.user_id}
+        defaultCommissionPercent={agentRow.default_commission_percent}
+      />
+
+      {rows.length > 0 && <CommissionSummaryCards totals={totals} />}
 
       {rows.length === 0 ? (
         <div className="rounded-2xl border border-dashed bg-card p-12 text-center">
@@ -121,6 +133,7 @@ export default async function AdminAgentPreviewPage({ params }: PageProps) {
                 <TableHead>Status</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-right">Commission</TableHead>
                 <TableHead className="hidden sm:table-cell">Updated</TableHead>
                 <TableHead className="w-[100px] text-right">Actions</TableHead>
               </TableRow>
@@ -132,6 +145,11 @@ export default async function AdminAgentPreviewPage({ params }: PageProps) {
                   row.property_images.sort(
                     (a, b) => a.display_order - b.display_order,
                   )[0];
+                const commissionDisplay = getAgentCommissionDisplay(
+                  row,
+                  id,
+                  agentDefaults,
+                );
                 return (
                   <TableRow key={row.id}>
                     <TableCell>
@@ -165,6 +183,9 @@ export default async function AdminAgentPreviewPage({ params }: PageProps) {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatZAR(Number(row.price))}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <PropertyCommissionCell display={commissionDisplay} />
                     </TableCell>
                     <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
                       {formatRelative(row.updated_at)}

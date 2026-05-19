@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { assertDashboardAdmin, getDashboardRole } from "@/lib/auth/dashboard-access";
+import { agentAccountExistsForAdmin } from "@/lib/agents/fetch-agent-roster";
 import { resolveUserIdByEmail } from "@/lib/auth/resolve-user-by-email";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { propertyFormSchema, type PropertyFormInput } from "@/lib/validation/property";
@@ -54,12 +55,7 @@ export async function createProperty(
   let assignedUserId: string | null = null;
   const uid = data.assigned_user_id?.trim();
   if (uid) {
-    const { data: acct } = await supabase
-      .from("agent_accounts")
-      .select("user_id")
-      .eq("user_id", uid)
-      .maybeSingle();
-    if (!acct) {
+    if (!(await agentAccountExistsForAdmin(uid))) {
       return {
         ok: false,
         error: "Selected agent is invalid or no longer exists.",
@@ -82,12 +78,7 @@ export async function createProperty(
           },
         };
       }
-      const { data: acct } = await supabase
-        .from("agent_accounts")
-        .select("user_id")
-        .eq("user_id", assignedUserId)
-        .maybeSingle();
-      if (!acct) {
+      if (!(await agentAccountExistsForAdmin(assignedUserId))) {
         return {
           ok: false,
           error: "That user is not registered as an agent.",
@@ -103,12 +94,7 @@ export async function createProperty(
   let sourcedByUserId: string | null = null;
   const sourcedUid = data.sourced_by_user_id?.trim();
   if (sourcedUid) {
-    const { data: srcAcct } = await supabase
-      .from("agent_accounts")
-      .select("user_id")
-      .eq("user_id", sourcedUid)
-      .maybeSingle();
-    if (!srcAcct) {
+    if (!(await agentAccountExistsForAdmin(sourcedUid))) {
       return {
         ok: false,
         error: "Selected sourcing agent is invalid or no longer exists.",
@@ -159,6 +145,10 @@ export async function createProperty(
         agent_photo_url: data.agent_photo_url || null,
         assigned_user_id: assignedUserId,
         sourced_by_user_id: sourcedByUserId,
+        commission_percent: data.commission_percent ?? null,
+        commission_amount: data.commission_amount ?? null,
+        sold_price:
+          data.status === "sold" ? (data.sold_price ?? null) : null,
         published_at: data.status === "published" ? new Date().toISOString() : null,
       })
       .select("id, slug")
@@ -239,12 +229,7 @@ export async function updateProperty(
   if (role === "admin") {
     const uid = data.assigned_user_id?.trim();
     if (uid) {
-      const { data: acct } = await supabase
-        .from("agent_accounts")
-        .select("user_id")
-        .eq("user_id", uid)
-        .maybeSingle();
-      if (!acct) {
+      if (!(await agentAccountExistsForAdmin(uid))) {
         return {
           ok: false,
           error: "Selected agent is invalid or no longer exists.",
@@ -267,12 +252,7 @@ export async function updateProperty(
             },
           };
         }
-        const { data: acct } = await supabase
-          .from("agent_accounts")
-          .select("user_id")
-          .eq("user_id", resolved)
-          .maybeSingle();
-        if (!acct) {
+        if (!(await agentAccountExistsForAdmin(resolved))) {
           return {
             ok: false,
             error: "That user is not registered as an agent.",
@@ -291,15 +271,18 @@ export async function updateProperty(
 
   let sourcedPatch: { sourced_by_user_id: string | null } | Record<string, never> =
     {};
+  let commissionPatch:
+    | {
+        commission_percent: number | null;
+        commission_amount: number | null;
+        sold_price: number | null;
+      }
+    | Record<string, never> = {};
+
   if (role === "admin") {
     const sid = data.sourced_by_user_id?.trim();
     if (sid) {
-      const { data: srcAcct } = await supabase
-        .from("agent_accounts")
-        .select("user_id")
-        .eq("user_id", sid)
-        .maybeSingle();
-      if (!srcAcct) {
+      if (!(await agentAccountExistsForAdmin(sid))) {
         return {
           ok: false,
           error: "Selected sourcing agent is invalid or no longer exists.",
@@ -312,6 +295,13 @@ export async function updateProperty(
     } else {
       sourcedPatch = { sourced_by_user_id: null };
     }
+
+    commissionPatch = {
+      commission_percent: data.commission_percent ?? null,
+      commission_amount: data.commission_amount ?? null,
+      sold_price:
+        data.status === "sold" ? (data.sold_price ?? null) : null,
+    };
   }
 
   const { error } = await supabase
@@ -320,6 +310,7 @@ export async function updateProperty(
       ...basePayload,
       ...assignedPatch,
       ...sourcedPatch,
+      ...commissionPatch,
     })
     .eq("id", id);
 
@@ -337,11 +328,19 @@ export async function updateProperty(
 export async function setPropertyStatus(
   id: string,
   status: "draft" | "published" | "sold",
+  options?: { soldPrice?: number },
 ): Promise<PropertyActionState> {
   const { supabase } = await requireUser();
-  const updates: { status: typeof status; published_at?: string } = { status };
+  const updates: {
+    status: typeof status;
+    published_at?: string;
+    sold_price?: number | null;
+  } = { status };
   if (status === "published") {
     updates.published_at = new Date().toISOString();
+  }
+  if (status === "sold" && options?.soldPrice != null) {
+    updates.sold_price = options.soldPrice;
   }
   const { error } = await supabase
     .from("properties")
@@ -351,6 +350,7 @@ export async function setPropertyStatus(
   revalidatePath("/admin/properties");
   revalidatePath("/admin/agents");
   revalidatePath("/agent/properties");
+  revalidatePath(`/admin/properties/${id}/edit`);
   revalidatePath("/");
   return SUCCESS;
 }

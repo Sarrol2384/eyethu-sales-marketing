@@ -262,8 +262,9 @@ export function LeadCaptureForm({ propertyId, propertyTitle, cta }: Props) {
             <span>
               <span className="font-medium">I&apos;m a first-time buyer.</span>{" "}
               <span className="text-muted-foreground">
-                Tick this and we&apos;ll mention FLISP subsidy options when we
-                chat.
+                Tick this and we&apos;ll know to talk about first-home options
+                when we follow up — in general terms only, with no assumption
+                that you qualify for a subsidy.
               </span>
             </span>
           </label>
@@ -297,12 +298,18 @@ export function LeadCaptureForm({ propertyId, propertyTitle, cta }: Props) {
           <Button
             type="submit"
             size="lg"
-            className="w-full"
+            className="w-full gap-2"
             disabled={isSubmitting}
           >
-            <Send className="size-4" />
-            {isSubmitting ? "Sending…" : cta}
+            <Send className="size-4 shrink-0" aria-hidden />
+            {isSubmitting ? "Sending enquiry…" : "Send enquiry"}
           </Button>
+          {cta.trim() && cta.trim().toLowerCase() !== "send enquiry" ? (
+            <p className="text-center text-xs text-muted-foreground">
+              An agent will follow up —{" "}
+              {cta.charAt(0).toLowerCase() + cta.slice(1)}
+            </p>
+          ) : null}
         </form>
       </CardContent>
     </Card>

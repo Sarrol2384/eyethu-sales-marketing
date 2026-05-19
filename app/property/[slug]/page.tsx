@@ -14,7 +14,8 @@ import { PropertyFeatures } from "@/components/property/PropertyFeatures";
 import { NeighbourhoodInfo } from "@/components/property/NeighbourhoodInfo";
 import { BondCalculator } from "@/components/property/BondCalculator";
 import { ViewTracker } from "@/components/property/ViewTracker";
-import { StaffSignInLinks } from "@/components/public/StaffSignInLinks";
+import { SiteHeader } from "@/components/public/SiteHeader";
+import { SiteFooter } from "@/components/public/SiteFooter";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getDashboardRole } from "@/lib/auth/dashboard-access";
 
@@ -123,7 +124,9 @@ export default async function PropertyPage({ params }: PageProps) {
   const addressLine = formatPropertyAddressLine(property);
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-4 sm:px-6 sm:pt-6">
+    <>
+      <SiteHeader />
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-8 pt-4 sm:px-6 sm:pt-6">
       <ViewTracker propertyId={property.id} />
 
       <nav className="mb-3 text-sm text-muted-foreground">
@@ -144,7 +147,7 @@ export default async function PropertyPage({ params }: PageProps) {
           />
         </div>
 
-        <div className="mt-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:sticky lg:top-6 lg:self-start">
+        <div className="mt-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:pr-0.5">
           <PropertyListingSummary
             headline={headline}
             propertyType={property.property_type}
@@ -192,11 +195,9 @@ export default async function PropertyPage({ params }: PageProps) {
           />
         </div>
       </div>
-
-      <footer className="mt-16 border-t pt-8">
-        <StaffSignInLinks />
-      </footer>
-    </main>
+      </main>
+      <SiteFooter />
+    </>
   );
 }
 

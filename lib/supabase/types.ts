@@ -55,6 +55,12 @@ export type PropertyRow = {
   assigned_user_id: string | null;
   /** Auth user id of the agent who sourced / mandated this listing. */
   sourced_by_user_id: string | null;
+  /** Optional override: agent commission as % of sale price. */
+  commission_percent: number | null;
+  /** Optional override: fixed agent commission in ZAR (wins over %). */
+  commission_amount: number | null;
+  /** Final sale price when status is sold. */
+  sold_price: number | null;
 };
 
 export type AgentAccountRow = {
@@ -63,6 +69,8 @@ export type AgentAccountRow = {
   display_name: string | null;
   phone: string | null;
   email: string | null;
+  /** Default agent commission as % of sale price for sale listings. */
+  default_commission_percent: number | null;
 };
 
 export type PropertyImageRow = {
@@ -124,7 +132,10 @@ export type Database = {
         Row: AgentAccountRow;
         Insert: Pick<AgentAccountRow, "user_id"> &
           Partial<
-            Pick<AgentAccountRow, "display_name" | "phone" | "email">
+            Pick<
+              AgentAccountRow,
+              "display_name" | "phone" | "email" | "default_commission_percent"
+            >
           >;
         Update: Partial<AgentAccountRow>;
         Relationships: [];

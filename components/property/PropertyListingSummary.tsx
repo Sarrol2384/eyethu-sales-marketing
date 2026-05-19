@@ -130,7 +130,7 @@ export function PropertyListingSummary({
           </Badge>
         )}
 
-        <div className="space-y-4 border-t pt-5">
+        <div id="enquire-form" className="scroll-mt-24 space-y-4 border-t pt-5">
           <LeadCaptureForm
             propertyId={propertyId}
             propertyTitle={propertyTitle}

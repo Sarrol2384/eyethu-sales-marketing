@@ -6,7 +6,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import {
   createAgentFormSchema,
+  updateAgentCommissionSchema,
   type CreateAgentFormInput,
+  type UpdateAgentCommissionInput,
 } from "@/lib/validation/agent";
 
 export type AgentActionState = {
@@ -78,6 +80,7 @@ export async function createAgent(
     display_name: data.display_name.trim(),
     email: data.email.trim().toLowerCase(),
     phone: data.phone?.trim() || null,
+    default_commission_percent: data.default_commission_percent ?? null,
   });
 
   if (insertErr) {
@@ -90,6 +93,36 @@ export async function createAgent(
 
   revalidatePath("/admin/agents");
   revalidatePath("/admin/properties/new");
+  return SUCCESS;
+}
+
+export async function updateAgentCommission(
+  input: UpdateAgentCommissionInput,
+): Promise<AgentActionState> {
+  await requireAdmin();
+
+  const parsed = updateAgentCommissionSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid commission rate.",
+    };
+  }
+
+  const { user_id, default_commission_percent } = parsed.data;
+  const admin = createSupabaseServiceClient();
+  const { error } = await admin
+    .from("agent_accounts")
+    .update({ default_commission_percent })
+    .eq("user_id", user_id);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/admin/agents");
+  revalidatePath(`/admin/agents/${user_id}`);
+  revalidatePath("/agent/properties");
   return SUCCESS;
 }
 

@@ -1,29 +1,21 @@
 import { NextResponse } from "next/server";
-import { getDashboardRole } from "@/lib/auth/dashboard-access";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { fetchAgentRosterForAdmin } from "@/lib/agents/fetch-agent-roster";
 
 export async function GET() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const { agents, error } = await fetchAgentRosterForAdmin();
+  if (error === "Unauthorized") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const role = await getDashboardRole(supabase, user.id);
-  if (role !== "admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const { data, error } = await supabase
-    .from("agent_accounts")
-    .select("user_id, display_name, email, phone")
-    .order("display_name", { ascending: true, nullsFirst: false });
-
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error }, { status: 500 });
   }
 
-  return NextResponse.json({ agents: data ?? [] });
+  return NextResponse.json({
+    agents: agents.map((a) => ({
+      user_id: a.user_id,
+      display_name: a.display_name,
+      email: a.email,
+      phone: a.phone,
+    })),
+  });
 }

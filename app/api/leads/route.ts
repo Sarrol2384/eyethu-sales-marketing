@@ -3,6 +3,7 @@ import { leadSubmissionSchema } from "@/lib/validation/lead";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { normalizeSAPhone } from "@/lib/format/phone";
 import { scoreLead } from "@/lib/leads/score";
+import { generateLeadSummary } from "@/lib/ai/lead-summary";
 import { sendAgentLeadEmail, sendLeadConfirmationEmail } from "@/lib/brevo/email";
 import { sendAgentLeadSMS } from "@/lib/brevo/sms";
 import { upsertBrevoContact } from "@/lib/brevo/contacts";
@@ -106,6 +107,30 @@ export async function POST(request: Request) {
     propertyPrice: property?.price ?? null,
   });
 
+  const ruleSummary = reasons.join(" · ");
+  const aiNarrative = await generateLeadSummary(
+    {
+      fullName: parsed.data.full_name.trim(),
+      phone: normalisedPhone,
+      email,
+      message,
+      isFirstTimeBuyer: parsed.data.is_first_time_buyer,
+      moveTimeline: parsed.data.move_timeline ?? null,
+      score,
+      category,
+      ruleReasons: reasons,
+      property: property
+        ? {
+            title: property.title,
+            suburb: property.suburb,
+            price: Number(property.price),
+          }
+        : null,
+    },
+    { timeoutMs: 8_000 },
+  );
+  const aiSummary = aiNarrative ?? ruleSummary;
+
   // ---------- Save the lead ----------
   const { data: inserted, error: insertError } = await supabase
     .from("leads")
@@ -123,7 +148,7 @@ export async function POST(request: Request) {
       utm_campaign: parsed.data.utm_campaign ?? null,
       lead_score: score,
       lead_category: category,
-      ai_summary: reasons.join(" · "),
+      ai_summary: aiSummary,
       attributed_agent_user_id: attributedAgentUserId,
       contacted: false,
     })

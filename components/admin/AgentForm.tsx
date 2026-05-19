@@ -27,6 +27,12 @@ export function AgentForm() {
       phone: String(fd.get("phone") ?? ""),
       password: String(fd.get("password") ?? ""),
       password_confirm: String(fd.get("password_confirm") ?? ""),
+      default_commission_percent: (() => {
+        const raw = String(fd.get("default_commission_percent") ?? "").trim();
+        if (raw === "") return undefined;
+        const n = Number(raw);
+        return Number.isNaN(n) ? undefined : n;
+      })(),
     };
 
     startTransition(async () => {
@@ -83,6 +89,29 @@ export function AgentForm() {
         />
         {fieldErrors.phone && (
           <p className="text-xs text-destructive">{fieldErrors.phone}</p>
+        )}
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="default_commission_percent">
+          Default commission % (optional)
+        </Label>
+        <Input
+          id="default_commission_percent"
+          name="default_commission_percent"
+          type="number"
+          min={0}
+          max={100}
+          step={0.01}
+          placeholder="e.g. 2.5"
+          aria-invalid={!!fieldErrors.default_commission_percent}
+        />
+        <p className="text-xs text-muted-foreground">
+          Percentage of sale price. Can be overridden per listing later.
+        </p>
+        {fieldErrors.default_commission_percent && (
+          <p className="text-xs text-destructive">
+            {fieldErrors.default_commission_percent}
+          </p>
         )}
       </div>
       <div className="space-y-1.5">

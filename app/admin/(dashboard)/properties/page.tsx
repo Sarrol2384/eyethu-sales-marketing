@@ -13,6 +13,7 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { PropertyRowActions } from "@/components/admin/PropertyRowActions";
+import { fetchAgentRosterForAdmin } from "@/lib/agents/fetch-agent-roster";
 import { formatZAR } from "@/lib/format/currency";
 import { formatRelative } from "@/lib/format/date";
 import type {
@@ -62,11 +63,9 @@ export default async function PropertiesListPage() {
   ];
   const sourcingLabelByUserId = new Map<string, string>();
   if (sourcedIds.length > 0) {
-    const { data: sourcingAgents } = await supabase
-      .from("agent_accounts")
-      .select("user_id, display_name, email")
-      .in("user_id", sourcedIds);
-    for (const a of sourcingAgents ?? []) {
+    const { agents: sourcingAgents } = await fetchAgentRosterForAdmin();
+    for (const a of sourcingAgents) {
+      if (!sourcedIds.includes(a.user_id)) continue;
       const label =
         a.display_name?.trim() || a.email?.trim() || a.user_id.slice(0, 8);
       sourcingLabelByUserId.set(a.user_id, label);
@@ -199,6 +198,8 @@ export default async function PropertiesListPage() {
                           id={row.id}
                           status={row.status}
                           title={row.title}
+                          allowSoldPriceCapture
+                          listingPrice={Number(row.price)}
                         />
                       </div>
                     </TableCell>

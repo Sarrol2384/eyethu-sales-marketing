@@ -26,6 +26,7 @@ import {
 } from "@/lib/validation/property";
 import { createProperty, updateProperty } from "@/lib/actions/properties";
 import { ImageUploader } from "./ImageUploader";
+import { AgentPhotoUpload } from "./AgentPhotoUpload";
 
 export type PropertyFormAgentOption = {
   user_id: string;
@@ -88,6 +89,9 @@ const DEFAULT_VALUES: PropertyFormInput = {
   assigned_agent_email: "",
   assigned_user_id: "",
   sourced_by_user_id: "",
+  commission_percent: undefined,
+  commission_amount: undefined,
+  sold_price: undefined,
 };
 
 export function PropertyForm({
@@ -125,6 +129,7 @@ export function PropertyForm({
   const listingType = watch("listing_type");
   const assignedUserId = watch("assigned_user_id");
   const sourcedByUserId = watch("sourced_by_user_id");
+  const agentPhotoUrl = watch("agent_photo_url") ?? "";
 
   function toggleFeature(feature: string) {
     const next = features.includes(feature)
@@ -679,6 +684,63 @@ export function PropertyForm({
         </Section>
       )}
 
+      {allowAgentAssignment && listingType === "sale" && (
+        <Section title="Commission (admin)">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Commission % override"
+              htmlFor="commission_percent"
+              error={errors.commission_percent?.message}
+            >
+              <Input
+                id="commission_percent"
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                placeholder="Uses agent default if empty"
+                {...register("commission_percent")}
+              />
+            </Field>
+            <Field
+              label="Fixed commission (R)"
+              htmlFor="commission_amount"
+              error={errors.commission_amount?.message}
+            >
+              <Input
+                id="commission_amount"
+                type="number"
+                min={0}
+                step={1000}
+                placeholder="Overrides % when set"
+                {...register("commission_amount")}
+              />
+            </Field>
+          </div>
+          {status === "sold" && (
+            <Field
+              label="Sold price (R)"
+              htmlFor="sold_price"
+              error={errors.sold_price?.message}
+            >
+              <Input
+                id="sold_price"
+                type="number"
+                min={0}
+                step={1000}
+                placeholder="Final sale price (defaults to listing price)"
+                {...register("sold_price")}
+              />
+            </Field>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Sale listings only. Fixed amount wins over %. If two agents share a
+            listing, each receives half. Rentals are not included in commission
+            totals yet.
+          </p>
+        </Section>
+      )}
+
       <Section title="Agent">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Agent name" htmlFor="agent_name">
@@ -690,9 +752,29 @@ export function PropertyForm({
           <Field label="Agent email" htmlFor="agent_email" error={errors.agent_email?.message}>
             <Input id="agent_email" type="email" {...register("agent_email")} />
           </Field>
-          <Field label="Agent photo URL" htmlFor="agent_photo_url" error={errors.agent_photo_url?.message}>
-            <Input id="agent_photo_url" {...register("agent_photo_url")} />
-          </Field>
+          <input type="hidden" {...register("agent_photo_url")} />
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Agent photo</Label>
+            {mode === "edit" && propertyId ? (
+              <AgentPhotoUpload
+                propertyId={propertyId}
+                photoUrl={agentPhotoUrl}
+                onUrlChange={(url) =>
+                  setValue("agent_photo_url", url, { shouldDirty: true })
+                }
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Upload an agent headshot after you save the listing (same as
+                property photos).
+              </p>
+            )}
+            {errors.agent_photo_url?.message ? (
+              <p className="text-xs text-destructive">
+                {errors.agent_photo_url.message}
+              </p>
+            ) : null}
+          </div>
         </div>
       </Section>
 

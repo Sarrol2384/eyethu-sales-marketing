@@ -70,6 +70,27 @@ export const propertyFormSchema = z.object({
   sourced_by_user_id: z
     .union([z.string().uuid(), z.literal("")])
     .optional(),
+
+  /** Admin-only: override commission % of sale price */
+  commission_percent: z
+    .union([
+      z.literal(""),
+      z.coerce.number().min(0, "Must be 0–100").max(100, "Must be 0–100"),
+    ])
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? undefined : v)),
+
+  /** Admin-only: fixed commission in ZAR (overrides %) */
+  commission_amount: z
+    .union([z.literal(""), z.coerce.number().nonnegative()])
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? undefined : v)),
+
+  /** Admin-only: final sale price when status is sold */
+  sold_price: z
+    .union([z.literal(""), z.coerce.number().nonnegative()])
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? undefined : v)),
 });
 
 export type PropertyFormInput = z.infer<typeof propertyFormSchema>;

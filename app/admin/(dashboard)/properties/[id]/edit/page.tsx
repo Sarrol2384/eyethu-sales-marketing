@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { PropertyForm } from "@/components/admin/PropertyForm";
+import { fetchAgentRosterForAdmin } from "@/lib/agents/fetch-agent-roster";
 import type {
   PropertyImageRow,
   PropertyRow,
@@ -31,14 +32,11 @@ export default async function EditPropertyPage({ params }: PageProps) {
     property_images: PropertyImageRow[];
   };
 
-  const { data: agentList } = await supabase
-    .from("agent_accounts")
-    .select("user_id, display_name, email, phone")
-    .order("display_name", { ascending: true, nullsFirst: false });
+  const { agents: agentList } = await fetchAgentRosterForAdmin();
 
   let assignedAgentEmail = "";
   if (row.assigned_user_id) {
-    const roster = (agentList ?? []).find(
+    const roster = agentList.find(
       (a) => a.user_id === row.assigned_user_id,
     );
     if (roster?.email?.trim()) {
@@ -89,6 +87,16 @@ export default async function EditPropertyPage({ params }: PageProps) {
     assigned_agent_email: assignedAgentEmail,
     assigned_user_id: row.assigned_user_id ?? "",
     sourced_by_user_id: row.sourced_by_user_id ?? "",
+    commission_percent:
+      row.commission_percent != null
+        ? Number(row.commission_percent)
+        : undefined,
+    commission_amount:
+      row.commission_amount != null
+        ? Number(row.commission_amount)
+        : undefined,
+    sold_price:
+      row.sold_price != null ? Number(row.sold_price) : undefined,
   };
 
   return (
@@ -103,7 +111,12 @@ export default async function EditPropertyPage({ params }: PageProps) {
         display_order: img.display_order,
       }))}
       allowAgentAssignment
-      agents={agentList ?? []}
+      agents={agentList.map((a) => ({
+        user_id: a.user_id,
+        display_name: a.display_name,
+        email: a.email,
+        phone: a.phone,
+      }))}
     />
   );
 }

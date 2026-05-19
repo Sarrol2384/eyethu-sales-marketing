@@ -118,12 +118,16 @@ export function BondCalculator({
           <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
             <Info className="mt-0.5 size-4 shrink-0 text-primary" />
             <p>
-              <span className="font-medium">First-time buyer?</span> If you earn
-              between {formatZAR(FLISP_MIN_INCOME)} and{" "}
-              {formatZAR(FLISP_MAX_INCOME)} per month, you may qualify for{" "}
-              <strong>FLISP / First Home Finance</strong> — a once-off subsidy
-              of R 30 000 to R 130 000 to help you buy your first home. Ask your
-              agent.
+              <span className="font-medium">First-time buyer programmes</span>{" "}
+              (general information only): subsidies such as{" "}
+              <strong>FLISP / First Home Finance</strong> use published income
+              bands (often around {formatZAR(FLISP_MIN_INCOME)}–{formatZAR(FLISP_MAX_INCOME)}{" "}
+              gross per month) and other rules.
+              Whether any programme applies to you depends on your full
+              household income, first-time-buyer status, the lender, and
+              official assessment — not this estimate. Ask your agent or bank
+              for a personalised view; nothing here is a promise of
+              qualification or subsidy.
             </p>
           </div>
         )}

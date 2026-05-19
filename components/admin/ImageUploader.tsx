@@ -7,8 +7,10 @@ import { Star, Trash2, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-
-const BUCKET = "property-images";
+import {
+  PROPERTY_IMAGES_BUCKET,
+  extractPropertyImagesStoragePath,
+} from "@/lib/supabase/storage-path";
 const MAX_IMAGES = 15;
 const COMPRESSION_OPTIONS = {
   maxSizeMB: 1.5,
@@ -68,7 +70,7 @@ export function ImageUploader({ propertyId, initialImages }: Props) {
             .slice(2, 8)}.${ext}`;
 
           const { error: uploadError } = await supabase.storage
-            .from(BUCKET)
+            .from(PROPERTY_IMAGES_BUCKET)
             .upload(path, compressed, {
               upsert: false,
               contentType: compressed.type || file.type,
@@ -81,7 +83,9 @@ export function ImageUploader({ propertyId, initialImages }: Props) {
             continue;
           }
 
-          const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+          const { data: pub } = supabase.storage
+            .from(PROPERTY_IMAGES_BUCKET)
+            .getPublicUrl(path);
 
           const isFirst = images.length === 0 && created.length === 0;
           const { data: inserted, error: insertError } = await supabase
@@ -161,9 +165,9 @@ export function ImageUploader({ propertyId, initialImages }: Props) {
       }
       // Best-effort: also clean up the storage object
       if (target) {
-        const path = extractStoragePath(target.image_url);
+        const path = extractPropertyImagesStoragePath(target.image_url);
         if (path) {
-          await supabase.storage.from(BUCKET).remove([path]);
+          await supabase.storage.from(PROPERTY_IMAGES_BUCKET).remove([path]);
         }
       }
       setImages((prev) => prev.filter((i) => i.id !== id));
@@ -266,12 +270,4 @@ export function ImageUploader({ propertyId, initialImages }: Props) {
       )}
     </div>
   );
-}
-
-/** Extract `<propertyId>/<file>` from a public Supabase Storage URL. */
-function extractStoragePath(url: string): string | null {
-  const marker = `/object/public/${BUCKET}/`;
-  const idx = url.indexOf(marker);
-  if (idx === -1) return null;
-  return url.slice(idx + marker.length);
 }

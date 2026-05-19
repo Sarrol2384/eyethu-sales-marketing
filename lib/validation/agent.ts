@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+const optionalPercent = z
+  .union([
+    z.literal(""),
+    z.coerce.number().min(0, "Must be 0–100").max(100, "Must be 0–100"),
+  ])
+  .optional()
+  .transform((v) => (v === "" || v === undefined ? undefined : v));
+
+const optionalMoney = z
+  .union([z.literal(""), z.coerce.number().nonnegative()])
+  .optional()
+  .transform((v) => (v === "" || v === undefined ? undefined : v));
+
 export const createAgentFormSchema = z
   .object({
     display_name: z.string().trim().min(1, "Name is required").max(160),
@@ -7,6 +20,7 @@ export const createAgentFormSchema = z
     phone: z.string().trim().max(20).optional(),
     password: z.string().min(8, "Password must be at least 8 characters"),
     password_confirm: z.string().min(1, "Confirm password"),
+    default_commission_percent: optionalPercent,
   })
   .refine((d) => d.password === d.password_confirm, {
     message: "Passwords do not match",
@@ -14,3 +28,16 @@ export const createAgentFormSchema = z
   });
 
 export type CreateAgentFormInput = z.infer<typeof createAgentFormSchema>;
+
+export const updateAgentCommissionSchema = z.object({
+  user_id: z.string().uuid(),
+  default_commission_percent: z
+    .number()
+    .min(0, "Must be 0–100")
+    .max(100, "Must be 0–100")
+    .nullable(),
+});
+
+export type UpdateAgentCommissionInput = z.infer<
+  typeof updateAgentCommissionSchema
+>;

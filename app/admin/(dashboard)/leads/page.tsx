@@ -1,6 +1,7 @@
 import { Users } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { LeadsTable, type AdminLead } from "@/components/admin/LeadsTable";
+import { fetchAgentRosterForAdmin } from "@/lib/agents/fetch-agent-roster";
 
 type RawLead = Omit<AdminLead, "attributed_agent_label"> & {
   attributed_agent_user_id: string | null;
@@ -46,11 +47,9 @@ export default async function LeadsPage({
   ];
   const agentLabelMap = new Map<string, string>();
   if (attributedIds.length > 0) {
-    const { data: agentRows } = await supabase
-      .from("agent_accounts")
-      .select("user_id, display_name, email")
-      .in("user_id", attributedIds);
-    for (const a of agentRows ?? []) {
+    const { agents: agentRows } = await fetchAgentRosterForAdmin();
+    for (const a of agentRows) {
+      if (!attributedIds.includes(a.user_id)) continue;
       agentLabelMap.set(
         a.user_id,
         a.display_name?.trim() || a.email?.trim() || a.user_id.slice(0, 8),

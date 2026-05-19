@@ -1,20 +1,22 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PropertyForm } from "@/components/admin/PropertyForm";
+import { fetchAgentRosterForAdmin } from "@/lib/agents/fetch-agent-roster";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewPropertyPage() {
-  const supabase = await createSupabaseServerClient();
-  const { data: agents } = await supabase
-    .from("agent_accounts")
-    .select("user_id, display_name, email, phone")
-    .order("display_name", { ascending: true, nullsFirst: false });
+  const { agents } = await fetchAgentRosterForAdmin();
 
   return (
     <PropertyForm
       mode="create"
       allowAgentAssignment
-      agents={agents ?? []}
+      agents={agents.map((a) => ({
+        user_id: a.user_id,
+        display_name: a.display_name,
+        email: a.email,
+        phone: a.phone,
+      }))}
     />
   );
 }

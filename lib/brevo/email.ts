@@ -127,8 +127,8 @@ export async function sendLeadConfirmationEmail(
   <p style="margin:0 0 12px;">We've received your enquiry about ${propertyLine}. One of our agents${input.agentName ? `, ${escapeHtml(input.agentName)},` : ""} will be in touch within one business day.</p>
   ${input.agentPhone ? `<p style="margin:0 0 12px;">If you'd like to chat sooner, give us a call on <a href="tel:${escapeHtml(input.agentPhone)}">${escapeHtml(formatSAPhoneDisplay(input.agentPhone))}</a>.</p>` : ""}
   ${input.property ? `<p style="margin: 24px 0;"><a href="${escapeHtml(propertyUrl)}" style="display:inline-block; background:#0c4a6e; color:#fff; text-decoration:none; padding: 10px 18px; border-radius: 6px;">View the listing again</a></p>` : ""}
-  <h3 style="margin: 24px 0 6px; font-size: 14px;">First-time buyer? A quick tip.</h3>
-  <p style="margin:0 0 12px; font-size: 14px; color:#444;">If you earn between R3,501 and R22,000/month, you may qualify for FLISP (First Home Finance) — a subsidy of R30,000 to R130,000 to help you buy your first home. We can walk you through it.</p>
+  <h3 style="margin: 24px 0 6px; font-size: 14px;">First-time buyer?</h3>
+  <p style="margin:0 0 12px; font-size: 14px; color:#444;">Government programmes such as FLISP (First Home Finance) can help some first-time buyers, but eligibility depends on your household income, official rules, and assessment — not on this enquiry alone. If it is relevant, we can explain the landscape in general terms when we call; we will not suggest you qualify without a proper check.</p>
   <p style="font-size: 12px; color: #888; margin-top: 32px;">— The Eyethu Property Group team</p>
 </body></html>`;
 

@@ -49,9 +49,9 @@ const aiResponseSchema = z.object({
 /**
  * Generate AI marketing content for a property listing.
  *
- * Tuned for SA first-time buyers: warm, plain-language tone, mentions FLISP
- * when the price band is eligible, calls out gated community / security
- * features where relevant.
+ * Tuned for SA first-time buyers: warm, plain-language tone. FLISP / First
+ * Home Finance may appear only as cautious, non-promissory context when
+ * allowed by the prompt (never property-level “eligibility”).
  */
 export async function generatePropertyContent(
   input: GenerateContentInput,
@@ -80,8 +80,14 @@ VOICE & STYLE:
 - Prices in the format "R 699 000" (R, space, number with spaces as thousand separators).
 - Sizes in m². No imperial units.
 
+FIRST-TIME BUYER / FLISP (CRITICAL):
+- Never say or imply that a buyer, this home, or this price "qualifies for FLISP", is "FLISP eligible", or "fits FLISP". Never promise a subsidy or amount for this purchase.
+- If (and only if) the user prompt allows programme context for sales in the typical first-home band, you may add at most one short optional sentence in the description, using cautious wording: e.g. first-time buyers could ask an agent about government programmes such as First Home Finance (FLISP), and that eligibility depends on household income, official rules, and assessment—not on this listing alone.
+- Do not mention FLISP, First Home Finance, or government purchase subsidies in seo_title, seo_description, headline, or cta.
+- If the user prompt says not to mention these programmes, omit them entirely from all fields.
+
 CONTENT REQUIREMENTS:
-1. description — 150 to 200 words. Open by painting a quick picture of arriving at the home. Cover key rooms/features. End with one warm line about who would love this home. Mention FLISP eligibility ONLY if explicitly told the property qualifies.
+1. description — 150 to 200 words. Open by painting a quick picture of arriving at the home. Cover key rooms/features. End with one warm line about who would love this home. Follow FIRST-TIME BUYER / FLISP rules above.
 2. seo_title — 50–60 characters. Format: "[Bedrooms] Bedroom [Property Type] for [Sale|Rent] in [Suburb] — [Price] | Eyethu PG"
 3. seo_description — 140–160 characters. Mention bedrooms, suburb, price, one standout feature.
 4. neighbourhood_summary — 80–120 words about the suburb itself: vibe, who lives there, what's nearby (schools, shops, transport), commute. Be accurate; if you don't know specifics, speak in confident generalities South Africans recognise (e.g. "close to the N2", "an easy commute to the city").
@@ -116,7 +122,7 @@ ${input.yearBuilt ? `Year built: ${input.yearBuilt}` : ""}
 Features: ${input.features.length > 0 ? input.features.join(", ") : "—"}
 ${input.manualDescription ? `\nAgent's notes (use to ground your description; do not invent beyond these): ${input.manualDescription}` : ""}
 
-FLISP-eligible price band: ${flispEligible ? "YES — feel free to mention FLISP / First Home Finance subsidy for first-time buyers earning R3,501–R22,000/month." : "NO — do not mention FLISP."}
+Programme mention rule for this listing: ${flispEligible ? `CONTEXT_ALLOWED — This is a sale under a typical first-home price cap. You may optionally add at most one cautious sentence in the description only, about government first-home support (FLISP / First Home Finance), strictly following the FIRST-TIME BUYER / FLISP rules in the system prompt (no "qualify" or "eligible" for buyer or property; eligibility depends on income and official assessment; suggest speaking to an agent). Do not imply this home or price guarantees access to a subsidy.` : "CONTEXT_NOT_ALLOWED — Do not mention FLISP, First Home Finance, or government purchase subsidies in any field."}
 
 Return JSON only.`;
 
