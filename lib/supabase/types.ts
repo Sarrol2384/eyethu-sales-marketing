@@ -193,6 +193,11 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      is_dashboard_agent: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+    };
   };
 };

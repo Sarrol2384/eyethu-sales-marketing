@@ -2,7 +2,6 @@ import { Users } from "lucide-react";
 import { redirect } from "next/navigation";
 import { resolveAgentDisplayLabelsByUserIds } from "@/lib/agents/resolve-agent-display-labels";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getDashboardRole } from "@/lib/auth/dashboard-access";
 import { LeadsTable, type AdminLead } from "@/components/admin/LeadsTable";
 
 type RawLead = Omit<AdminLead, "attributed_agent_label"> & {
@@ -21,11 +20,6 @@ export default async function AgentLeadsPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/agent/login");
-
-  const role = await getDashboardRole(supabase, user.id);
-  if (role !== "agent") {
-    redirect("/admin/leads");
-  }
 
   const { sort, dir } = await searchParams;
   const sortKey =
