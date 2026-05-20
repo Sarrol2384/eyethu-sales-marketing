@@ -17,6 +17,7 @@ import { AgentCommissionSettings } from "@/components/admin/AgentCommissionSetti
 import { CommissionSummaryCards } from "@/components/admin/CommissionSummaryCards";
 import { PropertyCommissionCell } from "@/components/admin/PropertyCommissionCell";
 import { fetchAgentByIdForAdmin } from "@/lib/agents/fetch-agent-roster";
+import { countLeadsForAgents, type LeadForAgentCount } from "@/lib/leads/agent-attribution";
 import {
   buildAgentDefaultsMap,
   getAgentCommissionDisplay,
@@ -72,11 +73,21 @@ export default async function AdminAgentPreviewPage({ params }: PageProps) {
     .or(`assigned_user_id.eq.${id},sourced_by_user_id.eq.${id}`)
     .order("updated_at", { ascending: false });
 
+  const { data: leadRows } = await supabase.from("leads").select(
+    `id, attributed_agent_user_id,
+     properties:property_id ( assigned_user_id, sourced_by_user_id )`,
+  );
+
   const rows = (data ?? []) as unknown as Row[];
   const label =
     agentRow.display_name ?? agentRow.email ?? agentRow.user_id;
   const agentDefaults = buildAgentDefaultsMap([agentRow]);
   const totals = sumAgentCommissions(rows, id, agentDefaults);
+  const leadCount =
+    countLeadsForAgents(
+      (leadRows ?? []) as unknown as LeadForAgentCount[],
+      [id],
+    ).get(id) ?? 0;
 
   return (
     <div className="space-y-6">
@@ -94,7 +105,7 @@ export default async function AdminAgentPreviewPage({ params }: PageProps) {
         </h1>
         <p className="text-sm text-muted-foreground">
           {rows.length} listing{rows.length === 1 ? "" : "s"} this agent manages
-          or sourced.
+          or sourced · {leadCount} lead{leadCount === 1 ? "" : "s"} attributed.
           {agentRow.default_commission_percent != null && (
             <>
               {" "}

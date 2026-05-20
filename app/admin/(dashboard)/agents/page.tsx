@@ -13,6 +13,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DeleteAgentButton } from "@/components/admin/DeleteAgentButton";
 import { CopyShareLinkButton } from "@/components/admin/CopyShareLinkButton";
 import { fetchAgentRosterForAdmin } from "@/lib/agents/fetch-agent-roster";
+import { countLeadsForAgents, type LeadForAgentCount } from "@/lib/leads/agent-attribution";
 import {
   buildAgentDefaultsMap,
   sumAgentCommissions,
@@ -28,7 +29,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AgentsListPage() {
   const supabase = await createSupabaseServerClient();
-  const [{ agents, error: agentsError }, { data: saleListings }] =
+  const [{ agents, error: agentsError }, { data: saleListings }, { data: leadRows }] =
     await Promise.all([
       fetchAgentRosterForAdmin(),
       supabase
@@ -38,11 +39,19 @@ export default async function AgentsListPage() {
          assigned_user_id, sourced_by_user_id`,
         )
         .eq("listing_type", "sale"),
+      supabase.from("leads").select(
+        `id, attributed_agent_user_id,
+         properties:property_id ( assigned_user_id, sourced_by_user_id )`,
+      ),
     ]);
 
   const rows = agents;
   const listings = (saleListings ?? []) as CommissionListing[];
   const agentDefaults = buildAgentDefaultsMap(rows);
+  const leadCounts = countLeadsForAgents(
+    (leadRows ?? []) as unknown as LeadForAgentCount[],
+    rows.map((r) => r.user_id),
+  );
 
   return (
     <div className="space-y-6">
@@ -86,15 +95,17 @@ export default async function AgentsListPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead className="hidden sm:table-cell">Phone</TableHead>
+                <TableHead className="text-right">Leads</TableHead>
                 <TableHead className="text-right">Earned</TableHead>
                 <TableHead className="text-right">Pipeline (est.)</TableHead>
                 <TableHead className="hidden md:table-cell">Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
               <TableRow className="bg-muted/30 text-xs text-muted-foreground hover:bg-muted/30">
-                <TableCell colSpan={7} className="py-1.5">
+                <TableCell colSpan={8} className="py-1.5">
                   Share an agent&apos;s link — any enquiry submitted via that
-                  link will be attributed to them. Commission totals are for
+                  link will be attributed to them. Lead counts include assigned,
+                  sourced, and referral attribution. Commission totals are for
                   sale listings only.
                 </TableCell>
               </TableRow>
@@ -115,6 +126,9 @@ export default async function AgentsListPage() {
                     </TableCell>
                     <TableCell className="hidden text-muted-foreground sm:table-cell">
                       {row.phone ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {leadCounts.get(row.user_id) ?? 0}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatZAR(totals.earned)}

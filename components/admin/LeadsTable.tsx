@@ -34,6 +34,7 @@ import {
 import { formatRelative, formatSADateTime } from "@/lib/format/date";
 import { MOVE_TIMELINE_LABELS } from "@/lib/validation/lead";
 import type { LeadCategory, MoveTimeline } from "@/lib/supabase/types";
+import type { LeadAgentPart } from "@/lib/leads/agent-attribution-types";
 import { markLeadContacted } from "@/lib/actions/properties";
 
 export type AdminLead = {
@@ -56,8 +57,10 @@ export type AdminLead = {
     slug: string;
     suburb: string;
   } | null;
-  /** Display name of the agent attributed via share link, if any. */
-  attributed_agent_label: string | null;
+  /** Combined agent label for table display. */
+  agent_label: string | null;
+  /** Per-role breakdown for expanded row. */
+  agent_parts: LeadAgentPart[];
 };
 
 type Props = {
@@ -121,6 +124,7 @@ export function LeadsTable({
             <TableHead className="w-[40px]"></TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Property</TableHead>
+            <TableHead className="hidden sm:table-cell">Agent</TableHead>
             <TableHead>
               <button
                 type="button"
@@ -218,6 +222,13 @@ function LeadRow({
             </span>
           )}
         </TableCell>
+        <TableCell className="hidden sm:table-cell">
+          {lead.agent_label ? (
+            <div className="line-clamp-2 text-sm">{lead.agent_label}</div>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
+        </TableCell>
         <TableCell>
           <ScoreBar score={lead.lead_score} category={lead.lead_category} />
         </TableCell>
@@ -254,7 +265,7 @@ function LeadRow({
       {expanded && (
         <TableRow className="bg-muted/30 hover:bg-muted/30">
           <TableCell></TableCell>
-          <TableCell colSpan={5}>
+          <TableCell colSpan={6}>
             <div className="space-y-3 py-2">
               <div className="flex flex-wrap gap-2">
                 <Button asChild size="sm" variant="outline">
@@ -323,11 +334,25 @@ function LeadRow({
                       : "Not yet"
                   }
                 />
-                {lead.attributed_agent_label && (
-                  <DetailRow
-                    label="Attributed to agent"
-                    value={lead.attributed_agent_label}
-                  />
+                {lead.agent_label && (
+                  <DetailRow label="Agents" value={lead.agent_label} />
+                )}
+                {lead.agent_parts.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Agent breakdown
+                    </div>
+                    <ul className="mt-1 space-y-0.5 text-sm">
+                      {lead.agent_parts.map((part) => (
+                        <li key={`${part.userId}-${part.role}`}>
+                          {part.name}{" "}
+                          <span className="text-muted-foreground">
+                            ({part.role})
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
 
