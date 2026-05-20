@@ -1,16 +1,11 @@
 import { Users } from "lucide-react";
 import { redirect } from "next/navigation";
-import { resolveAgentDisplayLabelsByUserIds } from "@/lib/agents/resolve-agent-display-labels";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { LeadsTable, type AdminLead } from "@/components/admin/LeadsTable";
-import {
-  buildLeadAgentDisplay,
-  collectAgentUserIdsFromLeads,
-  type LeadForAgentAttribution,
-} from "@/lib/leads/agent-attribution";
 
-type RawLead = Omit<AdminLead, "agent_label" | "agent_parts"> &
-  LeadForAgentAttribution;
+type RawLead = Omit<AdminLead, "agent_label" | "agent_parts"> & {
+  attributed_agent_user_id: string | null;
+};
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +29,7 @@ export default async function AgentLeadsPage({
     `id, full_name, phone, email, message, is_first_time_buyer,
      move_timeline, lead_score, lead_category, ai_summary,
      contacted, contacted_at, created_at, attributed_agent_user_id,
-     properties:property_id (
-       id, title, slug, suburb,
-       assigned_user_id, sourced_by_user_id, agent_name
-     )`,
+     properties:property_id ( id, title, slug, suburb )`,
   );
 
   if (sortKey === "score") {
@@ -49,20 +41,11 @@ export default async function AgentLeadsPage({
   const { data } = await query.limit(500);
   const rawLeads = (data ?? []) as unknown as RawLead[];
 
-  const agentUserIds = collectAgentUserIdsFromLeads(rawLeads);
-  const nameByUserId =
-    agentUserIds.length > 0
-      ? await resolveAgentDisplayLabelsByUserIds(agentUserIds)
-      : new Map<string, string>();
-
-  const leads: AdminLead[] = rawLeads.map((lead) => {
-    const { label, parts } = buildLeadAgentDisplay(lead, nameByUserId);
-    return {
-      ...lead,
-      agent_label: label,
-      agent_parts: parts,
-    };
-  });
+  const leads: AdminLead[] = rawLeads.map((lead) => ({
+    ...lead,
+    agent_label: null,
+    agent_parts: [],
+  }));
 
   return (
     <div className="space-y-6">
@@ -85,6 +68,7 @@ export default async function AgentLeadsPage({
         currentSort={sortKey}
         currentDir={dir ?? "desc"}
         listBasePath="/agent/leads"
+        showAgentColumn={false}
       />
     </div>
   );

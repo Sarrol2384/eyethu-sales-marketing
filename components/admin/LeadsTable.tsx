@@ -69,6 +69,8 @@ type Props = {
   currentDir: string;
   /** Base path for sort links (default admin leads). */
   listBasePath?: string;
+  /** Hide agent column (agent portal — leads are already scoped to the viewer). */
+  showAgentColumn?: boolean;
 };
 
 export function LeadsTable({
@@ -76,6 +78,7 @@ export function LeadsTable({
   currentSort,
   currentDir,
   listBasePath = "/admin/leads",
+  showAgentColumn = true,
 }: Props) {
   const router = useRouter();
   const params = useSearchParams();
@@ -124,7 +127,9 @@ export function LeadsTable({
             <TableHead className="w-[40px]"></TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Property</TableHead>
-            <TableHead className="hidden sm:table-cell">Agent</TableHead>
+            {showAgentColumn && (
+              <TableHead className="hidden sm:table-cell">Agent</TableHead>
+            )}
             <TableHead>
               <button
                 type="button"
@@ -154,6 +159,7 @@ export function LeadsTable({
               key={lead.id}
               lead={lead}
               expanded={expanded === lead.id}
+              showAgentColumn={showAgentColumn}
               onToggle={() =>
                 setExpanded((prev) => (prev === lead.id ? null : lead.id))
               }
@@ -170,16 +176,20 @@ export function LeadsTable({
 function LeadRow({
   lead,
   expanded,
+  showAgentColumn,
   onToggle,
   onMarkContacted,
   busy,
 }: {
   lead: AdminLead;
   expanded: boolean;
+  showAgentColumn: boolean;
   onToggle: () => void;
   onMarkContacted: (id: string, contacted: boolean) => void;
   busy: boolean;
 }) {
+  const detailColSpan = showAgentColumn ? 6 : 5;
+
   return (
     <>
       <TableRow
@@ -222,13 +232,15 @@ function LeadRow({
             </span>
           )}
         </TableCell>
-        <TableCell className="hidden sm:table-cell">
-          {lead.agent_label ? (
-            <div className="line-clamp-2 text-sm">{lead.agent_label}</div>
-          ) : (
-            <span className="text-xs text-muted-foreground">—</span>
-          )}
-        </TableCell>
+        {showAgentColumn && (
+          <TableCell className="hidden sm:table-cell">
+            {lead.agent_label ? (
+              <div className="line-clamp-2 text-sm">{lead.agent_label}</div>
+            ) : (
+              <span className="text-xs text-muted-foreground">—</span>
+            )}
+          </TableCell>
+        )}
         <TableCell>
           <ScoreBar score={lead.lead_score} category={lead.lead_category} />
         </TableCell>
@@ -265,7 +277,7 @@ function LeadRow({
       {expanded && (
         <TableRow className="bg-muted/30 hover:bg-muted/30">
           <TableCell></TableCell>
-          <TableCell colSpan={6}>
+          <TableCell colSpan={detailColSpan}>
             <div className="space-y-3 py-2">
               <div className="flex flex-wrap gap-2">
                 <Button asChild size="sm" variant="outline">
@@ -334,10 +346,10 @@ function LeadRow({
                       : "Not yet"
                   }
                 />
-                {lead.agent_label && (
+                {showAgentColumn && lead.agent_label && (
                   <DetailRow label="Agents" value={lead.agent_label} />
                 )}
-                {lead.agent_parts.length > 0 && (
+                {showAgentColumn && lead.agent_parts.length > 0 && (
                   <div className="sm:col-span-2">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Agent breakdown
