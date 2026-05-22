@@ -24,9 +24,20 @@ export async function fetchAgentRosterForAdmin(): Promise<{
     return { agents: [], error: "Unauthorized" };
   }
 
-  await assertDashboardAdmin(supabase, user.id);
+  try {
+    await assertDashboardAdmin(supabase, user.id);
+  } catch {
+    return { agents: [], error: "Forbidden" };
+  }
 
-  const admin = createSupabaseServiceClient();
+  let admin;
+  try {
+    admin = createSupabaseServiceClient();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Service client unavailable";
+    return { agents: [], error: message };
+  }
+
   const { data, error } = await admin
     .from("agent_accounts")
     .select(ROSTER_COLUMNS)

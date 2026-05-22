@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -25,8 +26,26 @@ import {
   type PropertyFormInput,
 } from "@/lib/validation/property";
 import { createProperty, updateProperty } from "@/lib/actions/properties";
-import { ImageUploader } from "./ImageUploader";
-import { AgentPhotoUpload } from "./AgentPhotoUpload";
+
+const ImageUploader = dynamic(
+  () => import("./ImageUploader").then((m) => m.ImageUploader),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-sm text-muted-foreground">Loading photo uploader…</p>
+    ),
+  },
+);
+
+const AgentPhotoUpload = dynamic(
+  () => import("./AgentPhotoUpload").then((m) => m.AgentPhotoUpload),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-sm text-muted-foreground">Loading photo uploader…</p>
+    ),
+  },
+);
 
 export type PropertyFormAgentOption = {
   user_id: string;

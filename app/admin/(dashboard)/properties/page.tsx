@@ -187,10 +187,14 @@ export default async function PropertiesListPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="size-11 shrink-0 sm:size-9"
                           asChild
                           title="Edit"
                         >
-                          <Link href={`/admin/properties/${row.id}/edit`}>
+                          <Link
+                            href={`/admin/properties/${row.id}/edit`}
+                            prefetch={false}
+                          >
                             <Pencil className="size-4" />
                           </Link>
                         </Button>
