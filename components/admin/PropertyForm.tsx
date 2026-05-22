@@ -369,6 +369,9 @@ export function PropertyForm({
       <Section title="Location">
         <Field label="Address" htmlFor="address" error={errors.address?.message}>
           <Input id="address" placeholder="12 Erica Street" {...register("address")} />
+          <p className="text-xs text-muted-foreground">
+            Admin reference only — not shown on the public listing.
+          </p>
         </Field>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Suburb" required htmlFor="suburb" error={errors.suburb?.message}>

@@ -202,14 +202,9 @@ export default async function PropertyPage({ params }: PageProps) {
 }
 
 function formatPropertyAddressLine(property: {
-  address: string | null;
   suburb: string;
   city: string;
-}): string | null {
-  const trimmed = property.address?.trim();
-  if (trimmed) {
-    return `${trimmed}, ${property.suburb}, ${property.city}`;
-  }
+}): string {
   return `${property.suburb}, ${property.city}`;
 }
 
