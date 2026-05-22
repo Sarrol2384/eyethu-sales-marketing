@@ -7,6 +7,7 @@ import { assertDashboardAdmin, getDashboardRole } from "@/lib/auth/dashboard-acc
 import { agentAccountExistsForAdmin } from "@/lib/agents/fetch-agent-roster";
 import { resolveUserIdByEmail } from "@/lib/auth/resolve-user-by-email";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { propertyFormSchema, type PropertyFormInput } from "@/lib/validation/property";
 import { buildPropertySlug, bumpSlug } from "@/lib/slugify";
 
@@ -397,11 +398,19 @@ export async function deleteLead(id: string): Promise<PropertyActionState> {
     return { ok: false, error: "Invalid lead id" };
   }
 
-  const { error } = await supabase
+  // Service role after admin check — RLS delete policy may be missing or block
+  // silently (0 rows) when using the anon/authenticated client.
+  const admin = createSupabaseServiceClient();
+  const { data, error } = await admin
     .from("leads")
     .delete()
-    .eq("id", parsed.data);
+    .eq("id", parsed.data)
+    .select("id");
+
   if (error) return { ok: false, error: error.message };
+  if (!data?.length) {
+    return { ok: false, error: "Lead not found or could not be deleted" };
+  }
 
   revalidatePath("/admin");
   revalidatePath("/admin/leads");
