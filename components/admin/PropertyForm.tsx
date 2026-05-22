@@ -252,6 +252,37 @@ export function PropertyForm({
     });
   }
 
+  const saveActions = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Select
+        value={status}
+        onValueChange={(v) =>
+          setValue("status", v as PropertyFormInput["status"], {
+            shouldValidate: true,
+            shouldDirty: true,
+          })
+        }
+      >
+        <SelectTrigger className="w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="draft">Draft</SelectItem>
+          <SelectItem value="published">Published</SelectItem>
+          <SelectItem value="sold">Sold</SelectItem>
+        </SelectContent>
+      </Select>
+      <Button type="submit" disabled={isPending}>
+        {isPending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Save className="size-4" />
+        )}
+        {isPending ? "Saving…" : "Save"}
+      </Button>
+    </div>
+  );
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit, onInvalid)}
@@ -268,32 +299,7 @@ export function PropertyForm({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select
-            value={status}
-            onValueChange={(v) =>
-              setValue("status", v as PropertyFormInput["status"], {
-                shouldValidate: true,
-                shouldDirty: true,
-              })
-            }
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="published">Published</SelectItem>
-              <SelectItem value="sold">Sold</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button type="submit" disabled={isPending}>
-            {isPending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Save className="size-4" />
-            )}
-            {isPending ? "Saving…" : "Save"}
-          </Button>
+          {saveActions}
         </div>
       </div>
 
@@ -814,6 +820,10 @@ export function PropertyForm({
           Photos can be uploaded once the listing is saved.
         </div>
       )}
+
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-6">
+        {saveActions}
+      </div>
     </form>
   );
 }
