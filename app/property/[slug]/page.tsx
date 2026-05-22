@@ -121,8 +121,6 @@ export default async function PropertyPage({ params }: PageProps) {
       ? `≈ ${formatZAR(Math.round(bondTeaser.monthlyPayment))} p/m bond`
       : null;
 
-  const addressLine = formatPropertyAddressLine(property);
-
   return (
     <>
       <SiteHeader />
@@ -161,7 +159,6 @@ export default async function PropertyPage({ params }: PageProps) {
             garages={property.garages}
             floorSizeSqm={property.floor_size_sqm}
             erfSizeSqm={property.erf_size_sqm}
-            addressLine={addressLine}
             propertyId={property.id}
             propertyTitle={property.title}
             cta={property.ai_cta ?? "Book a viewing"}
@@ -199,13 +196,6 @@ export default async function PropertyPage({ params }: PageProps) {
       <SiteFooter />
     </>
   );
-}
-
-function formatPropertyAddressLine(property: {
-  suburb: string;
-  city: string;
-}): string {
-  return `${property.suburb}, ${property.city}`;
 }
 
 function propertyTypeLabel(t: string): string {

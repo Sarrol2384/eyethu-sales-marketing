@@ -20,7 +20,6 @@ type Props = {
   garages: number;
   floorSizeSqm: number | null;
   erfSizeSqm: number | null;
-  addressLine: string | null;
   propertyId: string;
   propertyTitle: string;
   cta: string;
@@ -62,7 +61,6 @@ export function PropertyListingSummary({
   garages,
   floorSizeSqm,
   erfSizeSqm,
-  addressLine,
   propertyId,
   propertyTitle,
   cta,
@@ -116,12 +114,6 @@ export function PropertyListingSummary({
           floorSizeSqm={floorSizeSqm}
           erfSizeSqm={erfSizeSqm}
         />
-
-        {addressLine ? (
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {addressLine}
-          </p>
-        ) : null}
 
         {isGatedCommunity && (
           <Badge className="bg-primary/10 text-primary hover:bg-primary/15">
