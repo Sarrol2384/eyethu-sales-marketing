@@ -25,6 +25,11 @@ import {
   FEATURE_OPTIONS,
   type PropertyFormInput,
 } from "@/lib/validation/property";
+import {
+  buildGenerateContentRequest,
+  firstZodIssueMessage,
+  generateContentRequestSchema,
+} from "@/lib/validation/generate-content";
 import { createProperty, updateProperty } from "@/lib/actions/properties";
 
 const ImageUploader = dynamic(
@@ -154,40 +159,39 @@ export function PropertyForm({
     const next = features.includes(feature)
       ? features.filter((f) => f !== feature)
       : [...features, feature];
-    setValue("features", next, { shouldValidate: true });
+    setValue("features", next, { shouldDirty: true });
+  }
+
+  function onInvalid(errors: typeof form.formState.errors) {
+    const first = Object.entries(errors).find(([, err]) => err?.message);
+    if (first) {
+      const [key, err] = first;
+      toast.error(err?.message ?? "Please fix the highlighted fields");
+      const el =
+        document.getElementById(key) ??
+        document.querySelector<HTMLElement>(`[name="${key}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.focus({ preventScroll: true });
+    } else {
+      toast.error("Please fix the highlighted fields before saving");
+    }
   }
 
   async function handleGenerate() {
-    const values = form.getValues();
-    if (!values.title || !values.suburb || !values.price) {
-      toast.error("Please fill in at least the title, suburb, and price first.");
+    const parsed = generateContentRequestSchema.safeParse(
+      buildGenerateContentRequest(form.getValues()),
+    );
+    if (!parsed.success) {
+      toast.error(firstZodIssueMessage(parsed.error));
       return;
     }
+
     setAiLoading(true);
     try {
       const res = await fetch("/api/generate-content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: values.title,
-          propertyType: values.property_type,
-          listingType: values.listing_type,
-          price: values.price,
-          suburb: values.suburb,
-          city: values.city,
-          province: values.province,
-          isGatedCommunity: values.is_gated_community,
-          gatedCommunityName: values.gated_community_name || null,
-          bedrooms: values.bedrooms,
-          bathrooms: values.bathrooms,
-          garages: values.garages,
-          parkingSpaces: values.parking_spaces,
-          floorSizeSqm: values.floor_size_sqm ?? null,
-          erfSizeSqm: values.erf_size_sqm ?? null,
-          yearBuilt: values.year_built ?? null,
-          features: values.features,
-          manualDescription: values.manual_description || null,
-        }),
+        body: JSON.stringify(parsed.data),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as {
@@ -249,7 +253,11 @@ export function PropertyForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pb-24" noValidate>
+    <form
+      onSubmit={handleSubmit(onSubmit, onInvalid)}
+      className="space-y-6 pb-24"
+      noValidate
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -340,12 +348,14 @@ export function PropertyForm({
           >
             <Input
               id="price"
-              type="number"
-              min={0}
-              step={1000}
+              type="text"
+              inputMode="numeric"
               placeholder="699000"
               {...register("price")}
             />
+            <p className="text-xs text-muted-foreground">
+              Numbers only — no spaces or commas (e.g. 699000).
+            </p>
           </Field>
         </div>
       </Section>
@@ -418,9 +428,9 @@ export function PropertyForm({
           >
             <Input
               id="floor_size_sqm"
-              type="number"
-              min={0}
-              step="0.5"
+              type="text"
+              inputMode="decimal"
+              placeholder="Optional"
               {...register("floor_size_sqm")}
             />
           </Field>
@@ -431,9 +441,9 @@ export function PropertyForm({
           >
             <Input
               id="erf_size_sqm"
-              type="number"
-              min={0}
-              step="1"
+              type="text"
+              inputMode="numeric"
+              placeholder="Optional"
               {...register("erf_size_sqm")}
             />
           </Field>
@@ -713,10 +723,8 @@ export function PropertyForm({
             >
               <Input
                 id="commission_percent"
-                type="number"
-                min={0}
-                max={100}
-                step={0.01}
+                type="text"
+                inputMode="decimal"
                 placeholder="Uses agent default if empty"
                 {...register("commission_percent")}
               />
@@ -728,9 +736,8 @@ export function PropertyForm({
             >
               <Input
                 id="commission_amount"
-                type="number"
-                min={0}
-                step={1000}
+                type="text"
+                inputMode="numeric"
                 placeholder="Overrides % when set"
                 {...register("commission_amount")}
               />
@@ -744,9 +751,8 @@ export function PropertyForm({
             >
               <Input
                 id="sold_price"
-                type="number"
-                min={0}
-                step={1000}
+                type="text"
+                inputMode="numeric"
                 placeholder="Final sale price (defaults to listing price)"
                 {...register("sold_price")}
               />

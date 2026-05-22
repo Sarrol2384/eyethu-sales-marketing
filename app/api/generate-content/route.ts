@@ -1,28 +1,10 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { generatePropertyContent } from "@/lib/ai/generate";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-const inputSchema = z.object({
-  title: z.string().min(2).max(200),
-  propertyType: z.enum(["house", "townhouse", "apartment", "land"]),
-  listingType: z.enum(["sale", "rent"]),
-  price: z.number().nonnegative(),
-  suburb: z.string().min(1).max(120),
-  city: z.string().min(1).max(120),
-  province: z.string().min(1).max(120),
-  isGatedCommunity: z.boolean(),
-  gatedCommunityName: z.string().max(160).nullable().optional(),
-  bedrooms: z.number().int().nonnegative(),
-  bathrooms: z.number().int().nonnegative(),
-  garages: z.number().int().nonnegative(),
-  parkingSpaces: z.number().int().nonnegative(),
-  floorSizeSqm: z.number().nonnegative().nullable().optional(),
-  erfSizeSqm: z.number().nonnegative().nullable().optional(),
-  yearBuilt: z.number().int().nullable().optional(),
-  features: z.array(z.string()).default([]),
-  manualDescription: z.string().nullable().optional(),
-});
+import {
+  firstZodIssueMessage,
+  generateContentRequestSchema,
+} from "@/lib/validation/generate-content";
 
 export async function POST(request: Request) {
   // Admin-only — must have a valid Supabase session.
@@ -41,10 +23,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = inputSchema.safeParse(body);
+  const parsed = generateContentRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Invalid input", details: parsed.error.flatten() },
+      {
+        error: firstZodIssueMessage(parsed.error),
+        details: parsed.error.flatten(),
+      },
       { status: 400 },
     );
   }

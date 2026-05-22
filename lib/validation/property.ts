@@ -1,5 +1,35 @@
 import { z } from "zod";
 
+/** Blank or spaced numeric strings → undefined; strips SA thousand separators. */
+export function normalizeNumericInput(val: unknown): unknown {
+  if (val === null || val === undefined) return undefined;
+  if (typeof val === "string") {
+    const cleaned = val.trim().replace(/\s/g, "").replace(/,/g, "");
+    if (cleaned === "") return undefined;
+    return cleaned;
+  }
+  return val;
+}
+
+function optionalNonNegativeNumber(invalidMessage = "Enter a valid number") {
+  return z.preprocess(
+    normalizeNumericInput,
+    z.coerce
+      .number({ error: invalidMessage })
+      .nonnegative(invalidMessage)
+      .optional(),
+  );
+}
+
+function requiredNonNegativeNumber(invalidMessage = "Enter a valid price") {
+  return z.preprocess(
+    normalizeNumericInput,
+    z.coerce
+      .number({ error: invalidMessage })
+      .nonnegative("Price must be 0 or more"),
+  );
+}
+
 export const propertyTypeEnum = z.enum([
   "house",
   "townhouse",
@@ -15,7 +45,7 @@ export const propertyFormSchema = z.object({
   property_type: propertyTypeEnum,
   listing_type: listingTypeEnum,
   status: propertyStatusEnum.default("draft"),
-  price: z.coerce.number().nonnegative("Price must be 0 or more"),
+  price: requiredNonNegativeNumber(),
 
   address: z.string().trim().max(300).optional(),
   suburb: z.string().trim().min(2, "Suburb is required").max(120),
@@ -30,14 +60,17 @@ export const propertyFormSchema = z.object({
   garages: z.coerce.number().int().nonnegative().default(0),
   parking_spaces: z.coerce.number().int().nonnegative().default(0),
 
-  floor_size_sqm: z.coerce.number().nonnegative().optional(),
-  erf_size_sqm: z.coerce.number().nonnegative().optional(),
-  year_built: z.coerce
-    .number()
-    .int()
-    .min(1800)
-    .max(2100)
-    .optional(),
+  floor_size_sqm: optionalNonNegativeNumber(),
+  erf_size_sqm: optionalNonNegativeNumber(),
+  year_built: z.preprocess(
+    normalizeNumericInput,
+    z.coerce
+      .number()
+      .int()
+      .min(1800, "Year must be 1800–2100")
+      .max(2100, "Year must be 1800–2100")
+      .optional(),
+  ),
 
   features: z.array(z.string().trim().min(1)).default([]),
 
