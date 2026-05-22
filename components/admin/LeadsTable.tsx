@@ -14,6 +14,7 @@ import {
   Phone,
   Mail,
   Flame,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,15 @@ import { formatRelative, formatSADateTime } from "@/lib/format/date";
 import { MOVE_TIMELINE_LABELS } from "@/lib/validation/lead";
 import type { LeadCategory, MoveTimeline } from "@/lib/supabase/types";
 import type { LeadAgentPart } from "@/lib/leads/agent-attribution-types";
-import { markLeadContacted } from "@/lib/actions/properties";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { markLeadContacted, deleteLead } from "@/lib/actions/properties";
 
 export type AdminLead = {
   id: string;
@@ -71,6 +80,8 @@ type Props = {
   listBasePath?: string;
   /** Hide agent column (agent portal — leads are already scoped to the viewer). */
   showAgentColumn?: boolean;
+  /** Admin-only delete control (defaults to showAgentColumn). */
+  allowDelete?: boolean;
 };
 
 export function LeadsTable({
@@ -79,10 +90,12 @@ export function LeadsTable({
   currentDir,
   listBasePath = "/admin/leads",
   showAgentColumn = true,
+  allowDelete = showAgentColumn,
 }: Props) {
   const router = useRouter();
   const params = useSearchParams();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminLead | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function toggleSort(key: "created_at" | "score") {
@@ -108,6 +121,22 @@ export function LeadsTable({
     });
   }
 
+  function handleDeleteLead() {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    startTransition(async () => {
+      const res = await deleteLead(id);
+      if (!res.ok) {
+        toast.error(res.error ?? "Could not delete lead");
+        return;
+      }
+      toast.success("Lead removed");
+      setDeleteTarget(null);
+      setExpanded((prev) => (prev === id ? null : prev));
+      router.refresh();
+    });
+  }
+
   if (leads.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed bg-card p-12 text-center">
@@ -120,8 +149,9 @@ export function LeadsTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-card">
-      <Table>
+    <>
+      <div className="overflow-hidden rounded-xl border bg-card">
+        <Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[40px]"></TableHead>
@@ -150,7 +180,7 @@ export function LeadsTable({
                 <ArrowUpDown className="size-3.5" />
               </button>
             </TableHead>
-            <TableHead className="w-[180px] text-right">Actions</TableHead>
+            <TableHead className="w-[220px] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -160,16 +190,60 @@ export function LeadsTable({
               lead={lead}
               expanded={expanded === lead.id}
               showAgentColumn={showAgentColumn}
+              allowDelete={allowDelete}
               onToggle={() =>
                 setExpanded((prev) => (prev === lead.id ? null : lead.id))
               }
               onMarkContacted={handleMarkContacted}
+              onRequestDelete={setDeleteTarget}
               busy={isPending}
             />
           ))}
         </TableBody>
       </Table>
     </div>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this lead?</DialogTitle>
+            <DialogDescription>
+              {deleteTarget ? (
+                <>
+                  Permanently remove the enquiry from{" "}
+                  <strong>{deleteTarget.full_name}</strong>
+                  {deleteTarget.properties
+                    ? ` (${deleteTarget.properties.title})`
+                    : ""}
+                  . This cannot be undone.
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteLead}
+              disabled={isPending}
+            >
+              {isPending ? "Deleting…" : "Delete lead"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -177,15 +251,19 @@ function LeadRow({
   lead,
   expanded,
   showAgentColumn,
+  allowDelete,
   onToggle,
   onMarkContacted,
+  onRequestDelete,
   busy,
 }: {
   lead: AdminLead;
   expanded: boolean;
   showAgentColumn: boolean;
+  allowDelete: boolean;
   onToggle: () => void;
   onMarkContacted: (id: string, contacted: boolean) => void;
+  onRequestDelete: (lead: AdminLead) => void;
   busy: boolean;
 }) {
   const detailColSpan = showAgentColumn ? 6 : 5;
@@ -253,24 +331,39 @@ function LeadRow({
           className="text-right"
           onClick={(e) => e.stopPropagation()}
         >
-          <Button
-            size="sm"
-            variant={lead.contacted ? "outline" : "default"}
-            onClick={() => onMarkContacted(lead.id, !lead.contacted)}
-            disabled={busy}
-          >
-            {lead.contacted ? (
-              <>
-                <CheckCircle2 className="size-3.5" />
-                Contacted
-              </>
-            ) : (
-              <>
-                <Circle className="size-3.5" />
-                Mark contacted
-              </>
+          <div className="flex flex-wrap items-center justify-end gap-1">
+            <Button
+              size="sm"
+              variant={lead.contacted ? "outline" : "default"}
+              onClick={() => onMarkContacted(lead.id, !lead.contacted)}
+              disabled={busy}
+            >
+              {lead.contacted ? (
+                <>
+                  <CheckCircle2 className="size-3.5" />
+                  Contacted
+                </>
+              ) : (
+                <>
+                  <Circle className="size-3.5" />
+                  Mark contacted
+                </>
+              )}
+            </Button>
+            {allowDelete && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-destructive hover:text-destructive"
+                onClick={() => onRequestDelete(lead)}
+                disabled={busy}
+                title="Delete lead"
+              >
+                <Trash2 className="size-3.5" />
+                <span className="sr-only">Delete lead</span>
+              </Button>
             )}
-          </Button>
+          </div>
         </TableCell>
       </TableRow>
 

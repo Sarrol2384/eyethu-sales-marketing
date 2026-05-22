@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { assertDashboardAdmin, getDashboardRole } from "@/lib/auth/dashboard-access";
 import { agentAccountExistsForAdmin } from "@/lib/agents/fetch-agent-roster";
 import { resolveUserIdByEmail } from "@/lib/auth/resolve-user-by-email";
@@ -380,6 +381,31 @@ export async function markLeadContacted(
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/admin/leads");
+  revalidatePath("/agent/leads");
+  return SUCCESS;
+}
+
+const leadIdSchema = z.string().uuid();
+
+/** Admin-only — permanently removes a lead enquiry. */
+export async function deleteLead(id: string): Promise<PropertyActionState> {
+  const { supabase, user } = await requireUser();
+  await assertDashboardAdmin(supabase, user.id);
+
+  const parsed = leadIdSchema.safeParse(id);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid lead id" };
+  }
+
+  const { error } = await supabase
+    .from("leads")
+    .delete()
+    .eq("id", parsed.data);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/leads");
+  revalidatePath("/admin/agents");
   revalidatePath("/agent/leads");
   return SUCCESS;
 }
