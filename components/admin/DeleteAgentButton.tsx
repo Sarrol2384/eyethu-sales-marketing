@@ -25,7 +25,7 @@ export function DeleteAgentButton({
       onClick={() => {
         if (
           !confirm(
-            `Remove portal access for ${label}? Their login account stays — you can delete the user in Supabase Auth if needed.`,
+            `Remove ${label} from the agent roster and delete their login? They will not be able to sign in again.`,
           )
         ) {
           return;
@@ -36,7 +36,7 @@ export function DeleteAgentButton({
             toast.error(r.error ?? "Could not remove agent");
             return;
           }
-          toast.success("Agent removed from portal");
+          toast.success("Agent and login removed");
           router.refresh();
         });
       }}

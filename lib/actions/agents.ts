@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { assertDashboardAdmin } from "@/lib/auth/dashboard-access";
+import { findAuthUserIdByEmail } from "@/lib/auth/find-auth-user-by-email";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import {
@@ -52,29 +53,67 @@ export async function createAgent(
 
   const data = parsed.data;
   const admin = createSupabaseServiceClient();
+  const email = data.email.trim().toLowerCase();
 
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email: data.email.trim().toLowerCase(),
+  let created = await admin.auth.admin.createUser({
+    email,
     password: data.password,
     email_confirm: true,
   });
 
-  if (createErr || !created.user) {
-    const msg = createErr?.message ?? "Could not create user.";
-    if (
+  if (created.error || !created.data.user) {
+    const msg = created.error?.message ?? "Could not create user.";
+    const duplicate =
       msg.toLowerCase().includes("already") ||
-      msg.toLowerCase().includes("registered")
-    ) {
-      return {
-        ok: false,
-        error: "An account with this email already exists.",
-        fieldErrors: { email: "Use a different email or remove the existing user first." },
-      };
+      msg.toLowerCase().includes("registered");
+
+    if (duplicate) {
+      const existingUserId = await findAuthUserIdByEmail(admin, email);
+      if (existingUserId) {
+        const { data: existingAgent } = await admin
+          .from("agent_accounts")
+          .select("user_id")
+          .eq("user_id", existingUserId)
+          .maybeSingle();
+
+        if (existingAgent) {
+          return {
+            ok: false,
+            error: "An account with this email already exists.",
+            fieldErrors: {
+              email: "This agent is already on the roster.",
+            },
+          };
+        }
+
+        await admin.auth.admin.deleteUser(existingUserId);
+        created = await admin.auth.admin.createUser({
+          email,
+          password: data.password,
+          email_confirm: true,
+        });
+      }
     }
-    return { ok: false, error: msg };
+
+    if (created.error || !created.data.user) {
+      const retryMsg = created.error?.message ?? msg;
+      if (
+        retryMsg.toLowerCase().includes("already") ||
+        retryMsg.toLowerCase().includes("registered")
+      ) {
+        return {
+          ok: false,
+          error: "An account with this email already exists.",
+          fieldErrors: {
+            email: "Use a different email or remove the existing user first.",
+          },
+        };
+      }
+      return { ok: false, error: retryMsg };
+    }
   }
 
-  const userId = created.user.id;
+  const userId = created.data.user.id;
   const { error: insertErr } = await admin.from("agent_accounts").insert({
     user_id: userId,
     display_name: data.display_name.trim(),
@@ -139,6 +178,14 @@ export async function deleteAgent(userId: string): Promise<AgentActionState> {
 
   if (error) {
     return { ok: false, error: error.message };
+  }
+
+  const { error: authErr } = await admin.auth.admin.deleteUser(trimmed);
+  if (authErr) {
+    return {
+      ok: false,
+      error: `Agent removed from roster, but login could not be deleted: ${authErr.message}`,
+    };
   }
 
   revalidatePath("/admin/agents");
