@@ -120,7 +120,14 @@ export default async function AgentsListPage() {
                 );
                 return (
                   <TableRow key={row.user_id}>
-                    <TableCell className="font-medium">{label}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link
+                        className="text-primary hover:underline"
+                        href={`/admin/agents/${row.user_id}`}
+                      >
+                        {label}
+                      </Link>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {row.email ?? "—"}
                     </TableCell>
@@ -147,7 +154,7 @@ export default async function AgentsListPage() {
                         />
                         <Button variant="outline" size="sm" asChild>
                           <Link href={`/admin/agents/${row.user_id}`}>
-                            View portal
+                            Edit
                           </Link>
                         </Button>
                         <DeleteAgentButton userId={row.user_id} label={label} />

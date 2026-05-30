@@ -51,8 +51,10 @@ Smoke tests after deploy:
 ## Brevo
 
 - [ ] Domain/sender verification completed for `BREVO_SENDER_EMAIL`.
+- [ ] **API key IP restriction** disabled (or understood) for **Vercel serverless**: Brevo may block the first send from a new egress IP until you authorize it in the security alert email. For production, prefer turning off IP allowlisting on the key used by `BREVO_API_KEY` — Vercel IPs are not fixed like a single VPS.
 - [ ] Transactional templates (if any) match what [`lib/brevo/`](../lib/brevo/) sends.
 - [ ] With `BREVO_SMS_ENABLED=true`, trial SMS to a test agent number (cost awareness).
+- [ ] One test enquiry from the live site → agent receives “New lead” email on the **first** submit (no second attempt required).
 
 ## Cal.com and crons (future phases)
 

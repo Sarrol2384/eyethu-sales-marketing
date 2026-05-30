@@ -16,7 +16,7 @@ Rationale: [lib/leads/score.ts](../lib/leads/score.ts) is rule-only today; [app/
    - insert lead with rule summary first, then **async** update (more moving parts — prefer single request with fallback).
 3. **Cost / abuse**: keep existing rate limit + honeypot; optional env `LEAD_AI_SUMMARY_ENABLED=false` to disable LLM in emergencies.
 4. **Tests**: mock Anthropic in unit test or document manual smoke test.
-5. **Do not** block HTTP 200 on Brevo/AI failure paths already used for side effects.
+5. **Do not** block HTTP 200 on optional Brevo paths (confirmation email, contacts, SMS) or AI summary timeout fallback. **Agent lead notification email** is critical in [`app/api/leads/route.ts`](../app/api/leads/route.ts) — the public form must not show success if that send fails when Brevo is configured.
 
 ### Alternative track — Phases 9–11 crons
 

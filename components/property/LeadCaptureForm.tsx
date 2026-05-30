@@ -83,8 +83,13 @@ export function LeadCaptureForm({ propertyId, propertyTitle, cta }: Props) {
       });
 
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? "Something went wrong. Please try again.");
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+          notificationFailed?: boolean;
+        } | null;
+        const message =
+          body?.error ?? "Something went wrong. Please try again.";
+        throw new Error(message);
       }
 
       const hadEmail = Boolean(values.email?.trim());

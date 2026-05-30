@@ -1,5 +1,6 @@
 import "server-only";
 import { getBrevoClient, getBrevoSender } from "./client";
+import { withBrevoRetry, type BrevoSendResult } from "./send-with-retry";
 import { formatZAR } from "@/lib/format/currency";
 import { formatSAPhoneDisplay } from "@/lib/format/phone";
 import { MOVE_TIMELINE_LABELS, type MoveTimelineValue } from "@/lib/validation/lead";
@@ -48,16 +49,7 @@ const escapeHtml = (s: string) =>
             : "&#39;",
   );
 
-/**
- * Notify an agent that a new lead has come in for one of their listings.
- * Returns the Brevo messageId or `null` if Brevo isn't configured.
- */
-export async function sendAgentLeadEmail(
-  input: AgentLeadEmailInput,
-): Promise<string | null> {
-  const client = getBrevoClient();
-  if (!client) return null;
-
+function buildAgentLeadEmailPayload(input: AgentLeadEmailInput) {
   const propertyLine = input.property
     ? `<strong>${escapeHtml(input.property.title)}</strong> in ${escapeHtml(input.property.suburb)} — ${formatZAR(input.property.price)}`
     : `<em>General enquiry (no specific property)</em>`;
@@ -89,28 +81,46 @@ export async function sendAgentLeadEmail(
   <p style="font-size: 12px; color: #888; margin-top: 32px;">This is an automated notification from your Eyethu Property Group dashboard.</p>
 </body></html>`;
 
-  const response = await client.transactionalEmails.sendTransacEmail({
-    sender: getBrevoSender(),
-    to: [{ email: input.agentEmail, name: input.agentName ?? undefined }],
-    subject,
-    htmlContent,
-    replyTo: input.leadEmail
-      ? { email: input.leadEmail, name: input.leadName }
-      : undefined,
-  });
-
-  return response.messageId ?? null;
+  return { subject, htmlContent, propertyUrl };
 }
 
 /**
- * Thank-you email back to the lead confirming we received their enquiry.
+ * Notify an agent that a new lead has come in. Uses retries for transient Brevo
+ * failures (e.g. new Vercel egress IP). When Brevo is not configured, returns
+ * `{ ok: true, value: null }` (skipped).
  */
-export async function sendLeadConfirmationEmail(
-  input: LeadConfirmationEmailInput,
-): Promise<string | null> {
+export async function sendAgentLeadEmailWithRetry(
+  input: AgentLeadEmailInput,
+): Promise<BrevoSendResult<string | null>> {
   const client = getBrevoClient();
-  if (!client) return null;
+  if (!client) return { ok: true, value: null };
 
+  const { subject, htmlContent } = buildAgentLeadEmailPayload(input);
+
+  return withBrevoRetry("sendAgentLeadEmail", async () => {
+    const response = await client.transactionalEmails.sendTransacEmail({
+      sender: getBrevoSender(),
+      to: [{ email: input.agentEmail, name: input.agentName ?? undefined }],
+      subject,
+      htmlContent,
+      replyTo: input.leadEmail
+        ? { email: input.leadEmail, name: input.leadName }
+        : undefined,
+    });
+    return response.messageId ?? null;
+  });
+}
+
+/** @deprecated Prefer sendAgentLeadEmailWithRetry for lead capture. */
+export async function sendAgentLeadEmail(
+  input: AgentLeadEmailInput,
+): Promise<string | null> {
+  const result = await sendAgentLeadEmailWithRetry(input);
+  if (!result.ok) throw new Error(result.error);
+  return result.value;
+}
+
+function buildLeadConfirmationPayload(input: LeadConfirmationEmailInput) {
   const propertyLine = input.property
     ? `<strong>${escapeHtml(input.property.title)}</strong> in ${escapeHtml(input.property.suburb)}`
     : "our properties";
@@ -132,12 +142,37 @@ export async function sendLeadConfirmationEmail(
   <p style="font-size: 12px; color: #888; margin-top: 32px;">— The Eyethu Property Group team</p>
 </body></html>`;
 
-  const response = await client.transactionalEmails.sendTransacEmail({
-    sender: getBrevoSender(),
-    to: [{ email: input.leadEmail, name: input.leadName }],
-    subject,
-    htmlContent,
-  });
+  return { subject, htmlContent };
+}
 
-  return response.messageId ?? null;
+/**
+ * Thank-you email to the lead. Best-effort with retries; failures are non-fatal
+ * for the enquiry API.
+ */
+export async function sendLeadConfirmationEmailWithRetry(
+  input: LeadConfirmationEmailInput,
+): Promise<BrevoSendResult<string | null>> {
+  const client = getBrevoClient();
+  if (!client) return { ok: true, value: null };
+
+  const { subject, htmlContent } = buildLeadConfirmationPayload(input);
+
+  return withBrevoRetry("sendLeadConfirmationEmail", async () => {
+    const response = await client.transactionalEmails.sendTransacEmail({
+      sender: getBrevoSender(),
+      to: [{ email: input.leadEmail, name: input.leadName }],
+      subject,
+      htmlContent,
+    });
+    return response.messageId ?? null;
+  });
+}
+
+/** @deprecated Prefer sendLeadConfirmationEmailWithRetry for lead capture. */
+export async function sendLeadConfirmationEmail(
+  input: LeadConfirmationEmailInput,
+): Promise<string | null> {
+  const result = await sendLeadConfirmationEmailWithRetry(input);
+  if (!result.ok) throw new Error(result.error);
+  return result.value;
 }

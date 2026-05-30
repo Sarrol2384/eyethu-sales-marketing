@@ -4,7 +4,12 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { normalizeSAPhone } from "@/lib/format/phone";
 import { scoreLead } from "@/lib/leads/score";
 import { generateLeadSummary } from "@/lib/ai/lead-summary";
-import { sendAgentLeadEmail, sendLeadConfirmationEmail } from "@/lib/brevo/email";
+import { findRecentLeadForDedupe } from "@/lib/leads/find-recent-lead";
+import {
+  sendAgentLeadEmailWithRetry,
+  sendLeadConfirmationEmailWithRetry,
+} from "@/lib/brevo/email";
+import { getBrevoClient } from "@/lib/brevo/client";
 import { sendAgentLeadSMS } from "@/lib/brevo/sms";
 import { upsertBrevoContact } from "@/lib/brevo/contacts";
 import {
@@ -19,8 +24,10 @@ import {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
+const NOTIFY_FAILED_MESSAGE =
+  "We saved your enquiry but could not reach our team by email. Please try again in a minute or WhatsApp the agent below.";
+
 export async function POST(request: Request) {
-  // ---------- Rate limit ----------
   const ip = clientIpFromRequest(request);
   const rl = checkRateLimit(`leads:${ip}`, { max: 5, windowMs: 60_000 });
   if (!rl.allowed) {
@@ -35,7 +42,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // ---------- Parse + validate ----------
   let body: unknown;
   try {
     body = await request.json();
@@ -54,9 +60,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // ---------- Honeypot ----------
   if (parsed.data.hp_field && parsed.data.hp_field.length > 0) {
-    // Pretend it worked. Bots don't need to know.
     return NextResponse.json({ ok: true }, { status: 200 });
   }
 
@@ -70,7 +74,6 @@ export async function POST(request: Request) {
       ? parsed.data.message
       : null;
 
-  // ---------- Look up the property (for routing + scoring + Brevo context) ----------
   const supabase = createSupabaseServiceClient();
 
   let property: PropertyNotifyContext | null = null;
@@ -85,7 +88,6 @@ export async function POST(request: Request) {
     property = (data as unknown as PropertyNotifyContext | null) ?? null;
   }
 
-  // ---------- Resolve attribution (agent share-link ?ref=<uuid>) ----------
   let attributedAgentUserId: string | null = null;
   if (parsed.data.ref) {
     const { data: agentAcct } = await supabase
@@ -98,7 +100,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // ---------- Score ----------
   const { score, category, reasons } = scoreLead({
     isFirstTimeBuyer: parsed.data.is_first_time_buyer,
     moveTimeline: parsed.data.move_timeline ?? null,
@@ -131,49 +132,53 @@ export async function POST(request: Request) {
   );
   const aiSummary = aiNarrative ?? ruleSummary;
 
-  // ---------- Save the lead ----------
-  const { data: inserted, error: insertError } = await supabase
-    .from("leads")
-    .insert({
-      property_id: property?.id ?? null,
-      full_name: parsed.data.full_name.trim(),
-      phone: normalisedPhone,
-      email,
-      message,
-      is_first_time_buyer: parsed.data.is_first_time_buyer,
-      move_timeline: parsed.data.move_timeline ?? null,
-      source: parsed.data.source ?? null,
-      utm_source: parsed.data.utm_source ?? null,
-      utm_medium: parsed.data.utm_medium ?? null,
-      utm_campaign: parsed.data.utm_campaign ?? null,
-      lead_score: score,
-      lead_category: category,
-      ai_summary: aiSummary,
-      attributed_agent_user_id: attributedAgentUserId,
-      contacted: false,
-    })
-    .select("id")
-    .single();
+  const propertyId = property?.id ?? null;
+  const recent = await findRecentLeadForDedupe(
+    supabase,
+    propertyId,
+    normalisedPhone,
+  );
 
-  if (insertError || !inserted) {
-    console.error("[leads] insert failed", insertError);
-    return NextResponse.json(
-      { error: "Could not save your enquiry. Please try again." },
-      { status: 500 },
-    );
+  let leadId: string;
+
+  if (recent) {
+    leadId = recent.id;
+    console.info("[leads] reusing recent lead for dedupe", { leadId, propertyId });
+  } else {
+    const { data: inserted, error: insertError } = await supabase
+      .from("leads")
+      .insert({
+        property_id: propertyId,
+        full_name: parsed.data.full_name.trim(),
+        phone: normalisedPhone,
+        email,
+        message,
+        is_first_time_buyer: parsed.data.is_first_time_buyer,
+        move_timeline: parsed.data.move_timeline ?? null,
+        source: parsed.data.source ?? null,
+        utm_source: parsed.data.utm_source ?? null,
+        utm_medium: parsed.data.utm_medium ?? null,
+        utm_campaign: parsed.data.utm_campaign ?? null,
+        lead_score: score,
+        lead_category: category,
+        ai_summary: aiSummary,
+        attributed_agent_user_id: attributedAgentUserId,
+        contacted: false,
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !inserted) {
+      console.error("[leads] insert failed", insertError);
+      return NextResponse.json(
+        { error: "Could not save your enquiry. Please try again." },
+        { status: 500 },
+      );
+    }
+    leadId = inserted.id;
   }
 
-  // ---------- Fire-and-forget side effects ----------
-  // These run in parallel and we don't await them blocking — but in a route
-  // handler we DO need to await; otherwise the function ends before they fire.
-  // For latency we await them with a soft timeout via Promise.allSettled.
   const [firstName, ...lastNameParts] = parsed.data.full_name.trim().split(/\s+/);
-
-  const propertyUrl = property
-    ? `${SITE_URL}/property/${property.slug}`
-    : SITE_URL;
-
-  const sideEffects: Array<Promise<unknown>> = [];
 
   const agentEmailRecipient = await resolveAgentLeadEmailRecipient(
     supabase,
@@ -181,9 +186,12 @@ export async function POST(request: Request) {
     attributedAgentUserId,
   );
 
+  const brevoConfigured = getBrevoClient() !== null;
+  let agentEmailSent = false;
+
   if (agentEmailRecipient) {
-    sideEffects.push(
-      sendAgentLeadEmail({
+    if (brevoConfigured) {
+      const agentMail = await sendAgentLeadEmailWithRetry({
         agentEmail: agentEmailRecipient.email,
         agentName: agentEmailRecipient.name,
         leadName: parsed.data.full_name,
@@ -201,10 +209,29 @@ export async function POST(request: Request) {
             }
           : null,
         siteUrl: SITE_URL,
-      }).catch((err) =>
-        console.error("[leads] sendAgentLeadEmail failed", err),
-      ),
-    );
+      });
+
+      if (!agentMail.ok) {
+        console.error("[leads] agent notification failed", {
+          leadId,
+          error: agentMail.error,
+        });
+        return NextResponse.json(
+          {
+            error: NOTIFY_FAILED_MESSAGE,
+            lead: { id: leadId, score, category },
+            notificationFailed: true,
+          },
+          { status: 503 },
+        );
+      }
+      agentEmailSent = agentMail.value !== null;
+    } else {
+      console.warn(
+        "[leads] BREVO_API_KEY not set — lead saved without agent email",
+        { leadId, agentEmail: agentEmailRecipient.email },
+      );
+    }
   } else if (property ?? attributedAgentUserId) {
     console.warn(
       "[leads] no agent email recipient — property card, ref agent, and roster emails all empty",
@@ -212,15 +239,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const agentSmsPhone = await resolveAgentLeadSmsPhone(
-    supabase,
-    property,
-    attributedAgentUserId,
-  );
+  const sideEffects: Array<Promise<unknown>> = [];
 
   if (email) {
     sideEffects.push(
-      sendLeadConfirmationEmail({
+      sendLeadConfirmationEmailWithRetry({
         leadEmail: email,
         leadName: parsed.data.full_name,
         property: property
@@ -233,11 +256,20 @@ export async function POST(request: Request) {
         agentName: property?.agent_name ?? null,
         agentPhone: property?.agent_phone ?? null,
         siteUrl: SITE_URL,
-      }).catch((err) =>
-        console.error("[leads] sendLeadConfirmationEmail failed", err),
-      ),
+      }).then((result) => {
+        if (!result.ok) {
+          console.error("[leads] sendLeadConfirmationEmail failed", result.error);
+        }
+        return result;
+      }),
     );
   }
+
+  const agentSmsPhone = await resolveAgentLeadSmsPhone(
+    supabase,
+    property,
+    attributedAgentUserId,
+  );
 
   if (category === "hot" && agentSmsPhone && property) {
     sideEffects.push(
@@ -274,9 +306,15 @@ export async function POST(request: Request) {
 
   await Promise.allSettled(sideEffects);
 
-  void propertyUrl;
+  console.info("[leads] enquiry complete", {
+    leadId,
+    agentEmailSent,
+    confirmationAttempted: !!email,
+    category,
+  });
+
   return NextResponse.json({
     ok: true,
-    lead: { id: inserted.id, score, category },
+    lead: { id: leadId, score, category },
   });
 }

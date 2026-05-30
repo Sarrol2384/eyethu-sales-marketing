@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isSAPhone } from "@/lib/format/phone";
 
 const optionalPercent = z
   .union([
@@ -41,3 +42,19 @@ export const updateAgentCommissionSchema = z.object({
 export type UpdateAgentCommissionInput = z.infer<
   typeof updateAgentCommissionSchema
 >;
+
+export const updateAgentProfileSchema = z.object({
+  user_id: z.string().uuid(),
+  display_name: z.string().trim().min(1, "Name is required").max(160),
+  email: z.string().trim().email("Valid email required"),
+  phone: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => v ?? "")
+    .refine((v) => v === "" || isSAPhone(v), {
+      message: "Use a valid SA number (+27 or 0XX)",
+    }),
+});
+
+export type UpdateAgentProfileInput = z.infer<typeof updateAgentProfileSchema>;

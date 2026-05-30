@@ -32,7 +32,7 @@ Copy names and meanings from [`.env.local.example`](../.env.local.example). Use 
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key — **Sensitive**; server-only. Enable for Production (and Preview only if needed). |
 | `ANTHROPIC_API_KEY` | Required if admin AI listing generation runs in production |
-| `BREVO_API_KEY` | Brevo v3 API key |
+| `BREVO_API_KEY` | Brevo v3 API key. Disable **IP restriction** on this key for Vercel (or authorize new IPs when Brevo emails you) — see [PRODUCTION_BASELINE_CHECKLIST.md](./PRODUCTION_BASELINE_CHECKLIST.md) Brevo section. |
 | `BREVO_SENDER_EMAIL` | Verified sender in Brevo |
 | `BREVO_SENDER_NAME` | Display name (e.g. Eyethu Property Group) |
 | `BREVO_SMS_SENDER` | Alphanumeric sender ID (max 11 chars) |
