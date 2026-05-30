@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { LeadCaptureForm } from "@/components/property/LeadCaptureForm";
 import { AgentCard } from "@/components/property/AgentCard";
+import { ReferralAgentCard } from "@/components/property/ReferralAgentCard";
 import { ShareButtons } from "@/components/property/ShareButtons";
 import { PropertyDetails } from "@/components/property/PropertyDetails";
 import { Badge } from "@/components/ui/badge";
@@ -128,14 +130,27 @@ export function PropertyListingSummary({
             propertyTitle={propertyTitle}
             cta={cta}
           />
-          <AgentCard
-            name={agentName}
-            phone={agentPhone}
-            email={agentEmail}
-            photoUrl={agentPhotoUrl}
-            propertyTitle={propertyTitle}
-            propertyUrl={propertyUrl}
-          />
+          <Suspense
+            fallback={
+              <AgentCard
+                name={agentName}
+                phone={agentPhone}
+                email={agentEmail}
+                photoUrl={agentPhotoUrl}
+                propertyTitle={propertyTitle}
+                propertyUrl={propertyUrl}
+              />
+            }
+          >
+            <ReferralAgentCard
+              defaultName={agentName}
+              defaultPhone={agentPhone}
+              defaultEmail={agentEmail}
+              defaultPhotoUrl={agentPhotoUrl}
+              propertyTitle={propertyTitle}
+              propertyUrl={propertyUrl}
+            />
+          </Suspense>
           <div className="space-y-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Share this home
