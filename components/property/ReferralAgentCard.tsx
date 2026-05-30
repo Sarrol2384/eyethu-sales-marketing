@@ -9,14 +9,18 @@ type ReferralAgent = {
   name: string | null;
   phone: string | null;
   email: string | null;
+  photoUrl: string | null;
 };
 
 type Props = {
+  propertyId: string;
   /** Listing default agent (admin-entered fields on the property). */
   defaultName: string | null;
   defaultPhone: string | null;
   defaultEmail: string | null;
   defaultPhotoUrl: string | null;
+  assignedUserId: string | null;
+  sourcedUserId: string | null;
   propertyTitle: string;
   propertyUrl: string;
 };
@@ -41,11 +45,26 @@ function resolveRef(urlRef: string | null): string | null {
  * that agent — not the listing's default (admin) contact. Falls back to the
  * listing's default agent when there is no valid referral.
  */
+function listingPhotoForReferral(
+  referralUserId: string,
+  assignedUserId: string | null,
+  sourcedUserId: string | null,
+  listingPhotoUrl: string | null,
+): string | null {
+  const onListing =
+    assignedUserId === referralUserId || sourcedUserId === referralUserId;
+  if (!onListing) return null;
+  return listingPhotoUrl?.trim() || null;
+}
+
 export function ReferralAgentCard({
+  propertyId,
   defaultName,
   defaultPhone,
   defaultEmail,
   defaultPhotoUrl,
+  assignedUserId,
+  sourcedUserId,
   propertyTitle,
   propertyUrl,
 }: Props) {
@@ -64,7 +83,7 @@ export function ReferralAgentCard({
 
       try {
         const res = await fetch(
-          `/api/referral-agent?id=${encodeURIComponent(ref)}`,
+          `/api/referral-agent?id=${encodeURIComponent(ref)}&property_id=${encodeURIComponent(propertyId)}`,
         );
         if (!res.ok) {
           if (!cancelled) setReferral(null);
@@ -80,15 +99,24 @@ export function ReferralAgentCard({
     return () => {
       cancelled = true;
     };
-  }, [params]);
+  }, [params, propertyId]);
 
   if (referral) {
+    const photoUrl =
+      referral.photoUrl ??
+      listingPhotoForReferral(
+        referral.userId,
+        assignedUserId,
+        sourcedUserId,
+        defaultPhotoUrl,
+      );
+
     return (
       <AgentCard
         name={referral.name}
         phone={referral.phone}
         email={referral.email}
-        photoUrl={null}
+        photoUrl={photoUrl}
         propertyTitle={propertyTitle}
         propertyUrl={propertyUrl}
       />

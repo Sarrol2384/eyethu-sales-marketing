@@ -29,6 +29,8 @@ type Props = {
   agentPhone: string | null;
   agentEmail: string | null;
   agentPhotoUrl: string | null;
+  assignedUserId: string | null;
+  sourcedUserId: string | null;
   propertyUrl: string;
   sharePriceLabel: string;
   suburb: string;
@@ -70,6 +72,8 @@ export function PropertyListingSummary({
   agentPhone,
   agentEmail,
   agentPhotoUrl,
+  assignedUserId,
+  sourcedUserId,
   propertyUrl,
   sharePriceLabel,
   suburb,
@@ -143,10 +147,13 @@ export function PropertyListingSummary({
             }
           >
             <ReferralAgentCard
+              propertyId={propertyId}
               defaultName={agentName}
               defaultPhone={agentPhone}
               defaultEmail={agentEmail}
               defaultPhotoUrl={agentPhotoUrl}
+              assignedUserId={assignedUserId}
+              sourcedUserId={sourcedUserId}
               propertyTitle={propertyTitle}
               propertyUrl={propertyUrl}
             />

@@ -166,6 +166,8 @@ export default async function PropertyPage({ params }: PageProps) {
             agentPhone={property.agent_phone}
             agentEmail={property.agent_email}
             agentPhotoUrl={property.agent_photo_url}
+            assignedUserId={property.assigned_user_id}
+            sourcedUserId={property.sourced_by_user_id}
             propertyUrl={propertyUrl}
             sharePriceLabel={priceLabel}
             suburb={property.suburb}
