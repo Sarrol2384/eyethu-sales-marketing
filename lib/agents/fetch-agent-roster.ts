@@ -5,7 +5,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import type { AgentAccountRow } from "@/lib/supabase/types";
 
 const ROSTER_COLUMNS =
-  "user_id, display_name, email, phone, created_at, default_commission_percent";
+  "user_id, display_name, email, phone, photo_url, created_at, default_commission_percent";
 
 /**
  * Full agent roster for admin UI. Uses the service role after verifying the

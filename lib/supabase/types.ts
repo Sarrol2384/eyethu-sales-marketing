@@ -69,6 +69,8 @@ export type AgentAccountRow = {
   display_name: string | null;
   phone: string | null;
   email: string | null;
+  /** Public headshot for share links and listing agent cards. */
+  photo_url: string | null;
   /** Default agent commission as % of sale price for sale listings. */
   default_commission_percent: number | null;
 };
@@ -134,7 +136,11 @@ export type Database = {
           Partial<
             Pick<
               AgentAccountRow,
-              "display_name" | "phone" | "email" | "default_commission_percent"
+              | "display_name"
+              | "phone"
+              | "email"
+              | "photo_url"
+              | "default_commission_percent"
             >
           >;
         Update: Partial<AgentAccountRow>;

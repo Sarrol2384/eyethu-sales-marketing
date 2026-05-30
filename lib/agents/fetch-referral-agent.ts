@@ -12,49 +12,114 @@ export type ReferralAgentPublic = {
   photoUrl: string | null;
 };
 
+function normalise(s: string | null | undefined): string {
+  return (s ?? "").trim().toLowerCase();
+}
+
+function listingRepresentsAgent(
+  listing: {
+    assigned_user_id: string | null;
+    sourced_by_user_id: string | null;
+    agent_name: string | null;
+    agent_email: string | null;
+  },
+  userId: string,
+  name: string | null,
+  email: string | null,
+): boolean {
+  if (
+    listing.assigned_user_id === userId ||
+    listing.sourced_by_user_id === userId
+  ) {
+    return true;
+  }
+  const rosterEmail = normalise(email);
+  const listingEmail = normalise(listing.agent_email);
+  if (rosterEmail && listingEmail && rosterEmail === listingEmail) {
+    return true;
+  }
+  const rosterName = normalise(name);
+  const listingName = normalise(listing.agent_name);
+  if (rosterName && listingName && rosterName === listingName) {
+    return true;
+  }
+  return false;
+}
+
 async function resolveReferralAgentPhotoUrl(
   admin: SupabaseClient<Database>,
   userId: string,
+  rosterPhotoUrl: string | null,
+  name: string | null,
+  email: string | null,
   propertyId?: string | null,
 ): Promise<string | null> {
+  const roster = rosterPhotoUrl?.trim();
+  if (roster) return roster;
+
   if (propertyId) {
     const { data: listing } = await admin
       .from("properties")
-      .select("agent_photo_url, assigned_user_id, sourced_by_user_id")
+      .select(
+        "agent_photo_url, assigned_user_id, sourced_by_user_id, agent_name, agent_email",
+      )
       .eq("id", propertyId)
       .maybeSingle();
 
     if (listing) {
-      const onListing =
-        listing.assigned_user_id === userId ||
-        listing.sourced_by_user_id === userId;
       const url = listing.agent_photo_url?.trim();
-      if (onListing && url) return url;
+      if (url && listingRepresentsAgent(listing, userId, name, email)) {
+        return url;
+      }
     }
   }
 
   const { data: rows } = await admin
     .from("properties")
-    .select("agent_photo_url")
+    .select(
+      "agent_photo_url, assigned_user_id, sourced_by_user_id, agent_name, agent_email, updated_at",
+    )
     .or(`assigned_user_id.eq.${userId},sourced_by_user_id.eq.${userId}`)
     .not("agent_photo_url", "is", null)
     .order("updated_at", { ascending: false })
-    .limit(1);
+    .limit(20);
 
-  const fallback = rows?.[0]?.agent_photo_url?.trim();
-  return fallback || null;
+  for (const row of rows ?? []) {
+    const url = row.agent_photo_url?.trim();
+    if (url) return url;
+  }
+
+  const rosterEmail = normalise(email);
+  const rosterName = normalise(name);
+  if (!rosterEmail && !rosterName) return null;
+
+  const { data: byContact } = await admin
+    .from("properties")
+    .select("agent_photo_url, agent_name, agent_email, updated_at")
+    .not("agent_photo_url", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(50);
+
+  for (const row of byContact ?? []) {
+    const url = row.agent_photo_url?.trim();
+    if (!url) continue;
+    const listingEmail = normalise(row.agent_email);
+    const listingName = normalise(row.agent_name);
+    if (rosterEmail && listingEmail && rosterEmail === listingEmail) {
+      return url;
+    }
+    if (rosterName && listingName && rosterName === listingName) {
+      return url;
+    }
+  }
+
+  return null;
 }
 
 /**
  * Resolves the public-facing contact details for a referring agent (the
  * `?ref=<user_id>` share code). Uses the service role because `agent_accounts`
- * is not readable by anonymous visitors under RLS. Returns only the fields we
- * intend to show on a public listing's agent card — never commission or
- * internal data.
- *
- * Photos are stored per listing (`properties.agent_photo_url`), not on the
- * agent roster — we reuse a photo from this listing (when the agent is
- * assigned/sourced) or their most recently updated listing that has one.
+ * is not readable by anonymous visitors under RLS.
  */
 export async function fetchReferralAgentPublic(
   userId: string,
@@ -69,23 +134,29 @@ export async function fetchReferralAgentPublic(
 
   const { data, error } = await admin
     .from("agent_accounts")
-    .select("user_id, display_name, phone, email")
+    .select("user_id, display_name, phone, email, photo_url")
     .eq("user_id", userId)
     .maybeSingle();
 
   if (error || !data) return null;
 
+  const name = data.display_name?.trim() || null;
+  const email = data.email?.trim() || null;
+
   const photoUrl = await resolveReferralAgentPhotoUrl(
     admin,
     userId,
+    data.photo_url,
+    name,
+    email,
     options?.propertyId,
   );
 
   return {
     userId: data.user_id,
-    name: data.display_name?.trim() || null,
+    name,
     phone: data.phone?.trim() || null,
-    email: data.email?.trim() || null,
+    email,
     photoUrl,
   };
 }

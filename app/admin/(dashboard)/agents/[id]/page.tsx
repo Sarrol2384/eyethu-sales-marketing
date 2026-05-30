@@ -14,6 +14,7 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { AgentCommissionSettings } from "@/components/admin/AgentCommissionSettings";
+import { RosterAgentPhotoUpload } from "@/components/admin/RosterAgentPhotoUpload";
 import { CommissionSummaryCards } from "@/components/admin/CommissionSummaryCards";
 import { PropertyCommissionCell } from "@/components/admin/PropertyCommissionCell";
 import { fetchAgentByIdForAdmin } from "@/lib/agents/fetch-agent-roster";
@@ -115,6 +116,11 @@ export default async function AdminAgentPreviewPage({ params }: PageProps) {
           )}
         </p>
       </div>
+
+      <RosterAgentPhotoUpload
+        userId={agentRow.user_id}
+        photoUrl={agentRow.photo_url}
+      />
 
       <AgentCommissionSettings
         userId={agentRow.user_id}
