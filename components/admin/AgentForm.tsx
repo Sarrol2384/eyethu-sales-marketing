@@ -35,16 +35,24 @@ export function AgentForm() {
       })(),
     };
 
-    startTransition(async () => {
-      const res = await createAgent(input);
-      if (!res.ok) {
-        if (res.fieldErrors) setFieldErrors(res.fieldErrors);
-        toast.error(res.error ?? "Could not create agent");
-        return;
-      }
-      toast.success("Agent created. They can sign in at /agent/login.");
-      router.push("/admin/agents");
-      router.refresh();
+    startTransition(() => {
+      void (async () => {
+        try {
+          const res = await createAgent(input);
+          if (!res.ok) {
+            if (res.fieldErrors) setFieldErrors(res.fieldErrors);
+            toast.error(res.error ?? "Could not create agent");
+            return;
+          }
+          toast.success("Agent created. They can sign in at /agent/login.");
+          router.push("/admin/agents");
+          router.refresh();
+        } catch {
+          toast.error(
+            "Could not reach the server. Check your connection and try again.",
+          );
+        }
+      })();
     });
   }
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import Image from "next/image";
+import { Plus, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -21,9 +22,10 @@ import {
 } from "@/lib/commission/calculate";
 import { formatZAR } from "@/lib/format/currency";
 import { formatRelative } from "@/lib/format/date";
+import { extractPropertyImagesStoragePath } from "@/lib/supabase/storage-path";
 import type { AgentAccountRow } from "@/lib/supabase/types";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3010";
 
 export const dynamic = "force-dynamic";
 
@@ -122,9 +124,29 @@ export default async function AgentsListPage() {
                   <TableRow key={row.user_id}>
                     <TableCell className="font-medium">
                       <Link
-                        className="text-primary hover:underline"
+                        className="flex items-center gap-3 text-primary hover:underline"
                         href={`/admin/agents/${row.user_id}`}
                       >
+                        <span className="relative size-9 shrink-0 overflow-hidden rounded-full border bg-muted">
+                          {row.photo_url?.trim() ? (
+                            <Image
+                              src={row.photo_url.trim()}
+                              alt=""
+                              fill
+                              className="object-cover"
+                              sizes="36px"
+                              unoptimized={
+                                extractPropertyImagesStoragePath(
+                                  row.photo_url.trim(),
+                                ) === null
+                              }
+                            />
+                          ) : (
+                            <span className="flex size-full items-center justify-center text-muted-foreground">
+                              <User className="size-4" aria-hidden />
+                            </span>
+                          )}
+                        </span>
                         {label}
                       </Link>
                     </TableCell>

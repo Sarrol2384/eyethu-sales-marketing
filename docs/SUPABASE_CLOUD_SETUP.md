@@ -40,7 +40,7 @@ Edit `.env.local` and set:
 - `NEXT_PUBLIC_SUPABASE_URL` = Project URL  
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = anon key  
 - `SUPABASE_SERVICE_ROLE_KEY` = service_role key  
-- `NEXT_PUBLIC_SITE_URL` = `http://localhost:3000` (or your Vercel URL in production)
+- `NEXT_PUBLIC_SITE_URL` = `http://localhost:3010` for local dev (see [LOCAL_DEV.md](./LOCAL_DEV.md); or your Vercel URL in production)
 
 Other variables (`ANTHROPIC_API_KEY`, `BREVO_*`, etc.) can stay empty until you need AI generation or email.
 
@@ -63,8 +63,8 @@ npm install
 npm run dev
 ```
 
-- Homepage: [http://localhost:3000](http://localhost:3000)  
-- Admin: [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
+- Homepage: [http://localhost:3010](http://localhost:3010)  
+- Admin: [http://localhost:3010/admin/login](http://localhost:3010/admin/login)
 
 ## Vercel
 

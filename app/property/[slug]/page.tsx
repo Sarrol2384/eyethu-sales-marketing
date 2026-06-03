@@ -20,7 +20,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getDashboardRole } from "@/lib/auth/dashboard-access";
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3010";
 
 type PageProps = {
   params: Promise<{ slug: string }>;

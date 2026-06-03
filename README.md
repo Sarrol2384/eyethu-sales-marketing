@@ -20,8 +20,15 @@ npm install
 npm run dev
 ```
 
-- Site: [http://localhost:3000](http://localhost:3000)
-- Admin: [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
+If an admin page 404s in dev but works after `npm run build`, use `npm run dev:fresh` (clears `.next` and restarts).
+
+This project uses **port 3010** so it does not share `localhost:3000` with other Eyethu repos (e.g. digital-cards). See **[docs/LOCAL_DEV.md](docs/LOCAL_DEV.md)**.
+
+- Site: [http://localhost:3010](http://localhost:3010)
+- Admin: [http://localhost:3010/admin/login](http://localhost:3010/admin/login)
+- Agent portal: [http://localhost:3010/agent/login](http://localhost:3010/agent/login)
+
+Production: [https://eyethu-sales-marketing.vercel.app](https://eyethu-sales-marketing.vercel.app) (set `NEXT_PUBLIC_SITE_URL` to that URL on Vercel).
 
 See **AGENTS.md** for stack and coding rules.
 

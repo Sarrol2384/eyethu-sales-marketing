@@ -1,11 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { assertDashboardAdmin } from "@/lib/auth/dashboard-access";
 import { findAuthUserIdByEmail } from "@/lib/auth/find-auth-user-by-email";
 import { normalizeSAPhone } from "@/lib/format/phone";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import {
+  PROPERTY_IMAGES_BUCKET,
+  extractPropertyImagesStoragePath,
+} from "@/lib/supabase/storage-path";
 import {
   createAgentFormSchema,
   updateAgentCommissionSchema,
@@ -21,26 +26,63 @@ export type AgentActionState = {
   fieldErrors?: Partial<
     Record<keyof CreateAgentFormInput | keyof UpdateAgentProfileInput, string>
   >;
+  photoUrl?: string | null;
 };
 
 const SUCCESS: AgentActionState = { ok: true, error: null };
 
-async function requireAdmin() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error("Unauthorized");
+const agentUserIdSchema = z.string().uuid("Invalid agent id");
+
+const MAX_ROSTER_PHOTO_BYTES = 3 * 1024 * 1024;
+
+async function removeRosterPhotoObject(
+  admin: ReturnType<typeof createSupabaseServiceClient>,
+  photoUrl: string | null | undefined,
+) {
+  const path = photoUrl?.trim()
+    ? extractPropertyImagesStoragePath(photoUrl.trim())
+    : null;
+  if (!path) return;
+  await admin.storage.from(PROPERTY_IMAGES_BUCKET).remove([path]);
+}
+
+function revalidateAgentPaths(userId: string) {
+  revalidatePath("/admin/agents");
+  revalidatePath(`/admin/agents/${userId}`);
+}
+
+const SUPABASE_UNAVAILABLE =
+  "Cannot reach Supabase. Check your internet connection and try again.";
+
+type RequireAdminResult =
+  | { ok: true; supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>; user: { id: string } }
+  | { ok: false; error: string };
+
+async function requireAdmin(): Promise<RequireAdminResult> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { ok: false, error: "Unauthorized. Sign in again at /admin/login." };
+    }
+    await assertDashboardAdmin(supabase, user.id);
+    return { ok: true, supabase, user };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (message === "Forbidden") {
+      return { ok: false, error: "You do not have permission to manage agents." };
+    }
+    return { ok: false, error: SUPABASE_UNAVAILABLE };
   }
-  await assertDashboardAdmin(supabase, user.id);
-  return { supabase, user };
 }
 
 export async function createAgent(
   input: CreateAgentFormInput,
 ): Promise<AgentActionState> {
-  await requireAdmin();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { ok: false, error: auth.error };
 
   const parsed = createAgentFormSchema.safeParse(input);
   if (!parsed.success) {
@@ -143,7 +185,8 @@ export async function createAgent(
 export async function updateAgentCommission(
   input: UpdateAgentCommissionInput,
 ): Promise<AgentActionState> {
-  await requireAdmin();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { ok: false, error: auth.error };
 
   const parsed = updateAgentCommissionSchema.safeParse(input);
   if (!parsed.success) {
@@ -173,7 +216,8 @@ export async function updateAgentCommission(
 export async function updateAgentProfile(
   input: UpdateAgentProfileInput,
 ): Promise<AgentActionState> {
-  await requireAdmin();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { ok: false, error: auth.error };
 
   const parsed = updateAgentProfileSchema.safeParse(input);
   if (!parsed.success) {
@@ -244,15 +288,156 @@ export async function updateAgentProfile(
     return { ok: false, error: error.message };
   }
 
-  revalidatePath("/admin/agents");
-  revalidatePath(`/admin/agents/${user_id}`);
+  revalidateAgentPaths(user_id);
   revalidatePath("/admin/properties");
   revalidatePath("/admin/properties/new");
   return SUCCESS;
 }
 
+export async function uploadAgentRosterPhoto(
+  userId: string,
+  formData: FormData,
+): Promise<AgentActionState> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  const idParsed = agentUserIdSchema.safeParse(userId.trim());
+  if (!idParsed.success) {
+    return { ok: false, error: "Invalid agent." };
+  }
+  const user_id = idParsed.data;
+
+  const file = formData.get("photo");
+  if (!(file instanceof Blob) || file.size === 0) {
+    return { ok: false, error: "Choose an image file." };
+  }
+  if (!file.type.startsWith("image/")) {
+    return { ok: false, error: "File must be a JPEG, PNG, or WebP image." };
+  }
+  if (file.size > MAX_ROSTER_PHOTO_BYTES) {
+    return {
+      ok: false,
+      error: "Image is too large. Try a smaller file (under 3 MB).",
+    };
+  }
+
+  const admin = createSupabaseServiceClient();
+  const { data: existing } = await admin
+    .from("agent_accounts")
+    .select("photo_url")
+    .eq("user_id", user_id)
+    .maybeSingle();
+
+  if (!existing) {
+    return { ok: false, error: "Agent not found." };
+  }
+
+  const ext =
+    file.type === "image/png"
+      ? "png"
+      : file.type === "image/webp"
+        ? "webp"
+        : "jpg";
+  const path = `agents/${user_id}/photo-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}.${ext}`;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  const { error: uploadError } = await admin.storage
+    .from(PROPERTY_IMAGES_BUCKET)
+    .upload(path, bytes, {
+      upsert: false,
+      contentType: file.type,
+      cacheControl: "31536000",
+    });
+
+  if (uploadError) {
+    return {
+      ok: false,
+      error: uploadError.message ?? "Could not upload image to storage.",
+    };
+  }
+
+  const { data: pub } = admin.storage
+    .from(PROPERTY_IMAGES_BUCKET)
+    .getPublicUrl(path);
+  const publicUrl = pub.publicUrl;
+
+  const { data: updated, error: updateError } = await admin
+    .from("agent_accounts")
+    .update({ photo_url: publicUrl })
+    .eq("user_id", user_id)
+    .select("photo_url")
+    .maybeSingle();
+
+  if (updateError) {
+    await admin.storage.from(PROPERTY_IMAGES_BUCKET).remove([path]);
+    const hint =
+      updateError.message.includes("photo_url") &&
+      updateError.message.includes("column")
+        ? " Database migration missing: run 20260530140000_agent_accounts_photo_url.sql in Supabase."
+        : "";
+    return {
+      ok: false,
+      error: `${updateError.message}${hint}`,
+    };
+  }
+
+  if (!updated?.photo_url) {
+    await admin.storage.from(PROPERTY_IMAGES_BUCKET).remove([path]);
+    return {
+      ok: false,
+      error: "Photo saved to storage but not linked to the agent. Check admin permissions.",
+    };
+  }
+
+  await removeRosterPhotoObject(admin, existing.photo_url);
+  revalidateAgentPaths(user_id);
+
+  return { ok: true, error: null, photoUrl: updated.photo_url };
+}
+
+export async function removeAgentRosterPhoto(
+  userId: string,
+): Promise<AgentActionState> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  const idParsed = agentUserIdSchema.safeParse(userId.trim());
+  if (!idParsed.success) {
+    return { ok: false, error: "Invalid agent." };
+  }
+  const user_id = idParsed.data;
+
+  const admin = createSupabaseServiceClient();
+  const { data: existing } = await admin
+    .from("agent_accounts")
+    .select("photo_url")
+    .eq("user_id", user_id)
+    .maybeSingle();
+
+  if (!existing) {
+    return { ok: false, error: "Agent not found." };
+  }
+
+  const { error } = await admin
+    .from("agent_accounts")
+    .update({ photo_url: null })
+    .eq("user_id", user_id);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  await removeRosterPhotoObject(admin, existing.photo_url);
+  revalidateAgentPaths(user_id);
+
+  return { ok: true, error: null, photoUrl: null };
+}
+
 export async function deleteAgent(userId: string): Promise<AgentActionState> {
-  await requireAdmin();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { ok: false, error: auth.error };
 
   const trimmed = userId.trim();
   if (!trimmed) {

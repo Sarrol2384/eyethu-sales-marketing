@@ -14,7 +14,6 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { AgentCommissionSettings } from "@/components/admin/AgentCommissionSettings";
-import { AgentProfileSettings } from "@/components/admin/AgentProfileSettings";
 import { RosterAgentPhotoUpload } from "@/components/admin/RosterAgentPhotoUpload";
 import { CommissionSummaryCards } from "@/components/admin/CommissionSummaryCards";
 import { PropertyCommissionCell } from "@/components/admin/PropertyCommissionCell";
@@ -102,25 +101,21 @@ export default async function AdminAgentPreviewPage({ params }: PageProps) {
         </Button>
       </div>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{label}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Viewing portal as {label}
+        </h1>
         <p className="text-sm text-muted-foreground">
-          {rows.length} listing{rows.length === 1 ? "" : "s"} · {leadCount} lead
-          {leadCount === 1 ? "" : "s"}
+          {rows.length} listing{rows.length === 1 ? "" : "s"} this agent manages
+          or sourced · {leadCount} lead{leadCount === 1 ? "" : "s"} attributed.
           {agentRow.default_commission_percent != null && (
             <>
               {" "}
-              · default commission {agentRow.default_commission_percent}%
+              Default commission: {agentRow.default_commission_percent}% of sale
+              price.
             </>
           )}
         </p>
       </div>
-
-      <AgentProfileSettings
-        userId={agentRow.user_id}
-        displayName={agentRow.display_name}
-        email={agentRow.email}
-        phone={agentRow.phone}
-      />
 
       <RosterAgentPhotoUpload
         userId={agentRow.user_id}

@@ -22,7 +22,7 @@ import {
   type PropertyNotifyContext,
 } from "@/lib/leads/resolve-agent-notify";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3010";
 
 const NOTIFY_FAILED_MESSAGE =
   "We saved your enquiry but could not reach our team by email. Please try again in a minute or WhatsApp the agent below.";

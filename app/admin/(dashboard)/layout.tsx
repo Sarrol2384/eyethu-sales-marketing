@@ -10,13 +10,27 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/admin/login");
+  let supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  let user: { id: string; email?: string | null };
+  try {
+    supabase = await createSupabaseServerClient();
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) redirect("/admin/login");
+    user = data.user;
+  } catch {
+    throw new Error(
+      "Cannot reach Supabase. Check your internet connection and try again.",
+    );
+  }
 
-  const role = await getDashboardRole(supabase, user.id);
+  let role: Awaited<ReturnType<typeof getDashboardRole>>;
+  try {
+    role = await getDashboardRole(supabase, user.id);
+  } catch {
+    throw new Error(
+      "Cannot reach Supabase. Check your internet connection and try again.",
+    );
+  }
   if (role === "agent") {
     redirect("/agent/properties");
   }
