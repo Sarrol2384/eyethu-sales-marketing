@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getDashboardRole } from "@/lib/auth/dashboard-access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { AgentMobileChrome } from "@/components/agent/AgentMobileChrome";
 import { AgentSidebar } from "@/components/agent/AgentSidebar";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +28,14 @@ export default async function AgentDashboardLayout({
         userEmail={user.email ?? null}
         userId={user.id}
       />
-      <div className="flex flex-1 flex-col min-w-0">
-        <main className="flex-1 px-5 py-7 sm:px-8">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AgentMobileChrome
+          userEmail={user.email ?? null}
+          userId={user.id}
+        />
+        <main className="flex-1 px-5 py-7 pb-28 sm:px-8 md:pb-7">
+          {children}
+        </main>
       </div>
     </div>
   );

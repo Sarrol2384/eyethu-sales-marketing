@@ -2,27 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Home, LogOut, ChevronRight, Users } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CopyShareLinkButton } from "@/components/admin/CopyShareLinkButton";
+import { AgentNavLinks } from "@/components/agent/AgentNavLinks";
+import { AGENT_SITE_URL } from "@/components/agent/agent-portal-config";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3010";
-
-const NAV: Array<{
-  href: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  exact?: boolean;
-}> = [
-  { href: "/agent/properties", label: "My properties", icon: Home },
-  { href: "/agent/leads", label: "My leads", icon: Users },
-];
 
 export function AgentSidebar({
   userEmail,
@@ -31,7 +19,6 @@ export function AgentSidebar({
   userEmail: string | null;
   userId: string;
 }) {
-  const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -52,10 +39,9 @@ export function AgentSidebar({
 
   return (
     <aside className="hidden w-[17.5rem] shrink-0 border-r border-border/60 bg-card shadow-sm md:flex md:flex-col">
-      {/* Brand */}
       <Link
         href="/agent/properties"
-        className="flex justify-center border-b border-border/60 px-4 py-5 hover:bg-muted/40 transition-colors"
+        className="flex justify-center border-b border-border/60 px-4 py-5 transition-colors hover:bg-muted/40"
       >
         <Image
           src="/eyethu-logo.png"
@@ -68,43 +54,15 @@ export function AgentSidebar({
         />
       </Link>
 
-      {/* Label */}
       <div className="px-5 pb-2 pt-4">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
           Agent portal
         </span>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 space-y-0.5 px-3">
-        {NAV.map(({ href, label, icon: Icon, exact }) => {
-          const active =
-            exact === true
-              ? pathname === href
-              : pathname === href || pathname.startsWith(`${href}/`);
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "group flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-foreground/70 hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <span className="flex items-center gap-2.5">
-                <Icon className="size-4 shrink-0" />
-                {label}
-              </span>
-              {active && <ChevronRight className="size-3.5 opacity-70" />}
-            </Link>
-          );
-        })}
-      </nav>
+      <AgentNavLinks className="flex-1 px-3" />
 
-      {/* Footer */}
-      <div className="border-t border-border/60 p-3 space-y-3">
+      <div className="space-y-3 border-t border-border/60 p-3">
         <div className="rounded-md border bg-muted/30 p-2.5">
           <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
             Share this link on social or WhatsApp — enquiries are attributed to
@@ -112,7 +70,7 @@ export function AgentSidebar({
           </p>
           <CopyShareLinkButton
             agentUserId={userId}
-            siteUrl={SITE_URL}
+            siteUrl={AGENT_SITE_URL}
             actionLabel="Copy my link"
             className="w-full"
           />
