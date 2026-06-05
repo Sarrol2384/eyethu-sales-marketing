@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertDashboardAdmin } from "@/lib/auth/dashboard-access";
 import { generatePropertyContent } from "@/lib/ai/generate";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -14,6 +15,12 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    await assertDashboardAdmin(supabase, user.id);
+  } catch {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   let body: unknown;

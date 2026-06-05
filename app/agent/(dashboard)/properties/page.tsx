@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { Pencil, Eye, ExternalLink } from "lucide-react";
+import { Eye, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/table";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { PropertyRowActions } from "@/components/admin/PropertyRowActions";
 import { CommissionSummaryCards } from "@/components/admin/CommissionSummaryCards";
 import { PropertyCommissionCell } from "@/components/admin/PropertyCommissionCell";
 import {
@@ -88,7 +87,7 @@ export default async function AgentPropertiesPage() {
         <h1 className="text-2xl font-semibold tracking-tight">My properties</h1>
         <p className="text-sm text-muted-foreground">
           {rows.length} listing{rows.length === 1 ? "" : "s"} you manage or
-          sourced (mandated).
+          sourced (mandated). View only — ask admin to add or change listings.
           {agentRow?.default_commission_percent != null && (
             <>
               {" "}
@@ -106,7 +105,8 @@ export default async function AgentPropertiesPage() {
           <h2 className="text-lg font-semibold">No listings yet</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             When an administrator assigns you to a property, it will appear
-            here.
+            here. Only admin can add or edit listings — contact the office if
+            something needs updating.
           </p>
         </div>
       ) : (
@@ -193,22 +193,6 @@ export default async function AgentPropertiesPage() {
                             </Link>
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          asChild
-                          title="Edit"
-                        >
-                          <Link href={`/agent/properties/${row.id}/edit`}>
-                            <Pencil className="size-4" />
-                          </Link>
-                        </Button>
-                        <PropertyRowActions
-                          id={row.id}
-                          status={row.status}
-                          title={row.title}
-                          allowDelete={false}
-                        />
                       </div>
                     </TableCell>
                   </TableRow>

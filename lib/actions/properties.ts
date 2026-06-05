@@ -181,6 +181,7 @@ export async function updateProperty(
   input: PropertyFormInput,
 ): Promise<PropertyActionState> {
   const { supabase, user } = await requireUser();
+  await assertDashboardAdmin(supabase, user.id);
   const role = await getDashboardRole(supabase, user.id);
 
   const parsed = propertyFormSchema.safeParse(input);
@@ -332,7 +333,8 @@ export async function setPropertyStatus(
   status: "draft" | "published" | "sold",
   options?: { soldPrice?: number },
 ): Promise<PropertyActionState> {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  await assertDashboardAdmin(supabase, user.id);
   const updates: {
     status: typeof status;
     published_at?: string;

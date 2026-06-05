@@ -190,6 +190,12 @@ export async function POST(request: Request) {
   let agentEmailSent = false;
 
   if (agentEmailRecipient) {
+    console.info("[leads] agent notify recipient", {
+      source: agentEmailRecipient.source,
+      email: agentEmailRecipient.email,
+      attributedAgentUserId,
+      propertyId: property?.id ?? null,
+    });
     if (brevoConfigured) {
       const agentMail = await sendAgentLeadEmailWithRetry({
         agentEmail: agentEmailRecipient.email,
