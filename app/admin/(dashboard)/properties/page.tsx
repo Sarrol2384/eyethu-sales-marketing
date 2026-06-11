@@ -110,11 +110,11 @@ export default async function PropertiesListPage() {
                 <TableHead className="w-[60px]"></TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead className="hidden md:table-cell">Sourcing</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Price</TableHead>
+                <TableHead className="hidden md:table-cell">Status</TableHead>
+                <TableHead className="hidden md:table-cell">Type</TableHead>
+                <TableHead className="hidden md:table-cell text-right">Price</TableHead>
                 <TableHead className="hidden sm:table-cell">Updated</TableHead>
-                <TableHead className="w-[100px] text-right">Actions</TableHead>
+                <TableHead className="w-[4.5rem] text-right md:w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -143,10 +143,19 @@ export default async function PropertiesListPage() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{row.title}</div>
+                    <TableCell className="min-w-0 max-w-[14rem] sm:max-w-none">
+                      <div className="line-clamp-2 font-medium">{row.title}</div>
                       <div className="text-xs text-muted-foreground">
                         {row.suburb} · {row.bedrooms} bed, {row.bathrooms} bath
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2 md:hidden">
+                        <StatusBadge status={row.status} />
+                        <span className="text-xs capitalize text-muted-foreground">
+                          {row.property_type}
+                        </span>
+                        <span className="text-xs font-medium tabular-nums">
+                          {formatZAR(Number(row.price))}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="hidden max-w-[10rem] truncate text-sm text-muted-foreground md:table-cell">
@@ -155,13 +164,13 @@ export default async function PropertiesListPage() {
                           "—")
                         : "—"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <StatusBadge status={row.status} />
                     </TableCell>
-                    <TableCell className="capitalize">
+                    <TableCell className="hidden capitalize md:table-cell">
                       {row.property_type}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="hidden text-right tabular-nums md:table-cell">
                       {formatZAR(Number(row.price))}
                     </TableCell>
                     <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">

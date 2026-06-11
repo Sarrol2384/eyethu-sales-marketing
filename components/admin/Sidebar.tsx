@@ -2,16 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  Home,
-  Users,
-  LogOut,
-  Plus,
-  ChevronRight,
-  UserCog,
-} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { LogOut, Plus } from "lucide-react";
+import { AdminNavLinks } from "@/components/admin/AdminNavLinks";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -24,28 +17,13 @@ import {
 } from "@/components/ui/select";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-
 type PreviewAgent = {
   user_id: string;
   display_name: string | null;
   email: string | null;
 };
 
-const NAV: Array<{
-  href: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  exact?: boolean;
-}> = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/properties", label: "Properties", icon: Home },
-  { href: "/admin/agents", label: "Agents", icon: UserCog },
-  { href: "/admin/leads", label: "Leads", icon: Users },
-];
-
 export function Sidebar({ userEmail }: { userEmail: string | null }) {
-  const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
   const [previewAgents, setPreviewAgents] = useState<PreviewAgent[]>([]);
@@ -79,7 +57,7 @@ export function Sidebar({ userEmail }: { userEmail: string | null }) {
   }
 
   return (
-    <aside className="hidden w-[17.5rem] shrink-0 border-r border-border/60 bg-card shadow-sm md:flex md:flex-col">
+    <aside className="max-md:hidden md:flex md:w-[17.5rem] md:shrink-0 md:flex-col border-r border-border/60 bg-card shadow-sm">
       {/* Brand */}
       <Link
         href="/admin"
@@ -104,31 +82,9 @@ export function Sidebar({ userEmail }: { userEmail: string | null }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-0.5 px-3">
-        {NAV.map(({ href, label, icon: Icon, exact }) => {
-          const active = exact
-            ? pathname === href
-            : pathname === href || pathname.startsWith(`${href}/`);
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "group flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-foreground/70 hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <span className="flex items-center gap-2.5">
-                <Icon className="size-4 shrink-0" />
-                {label}
-              </span>
-              {active && <ChevronRight className="size-3.5 opacity-70" />}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="flex-1 px-3">
+        <AdminNavLinks />
+      </div>
 
       {previewAgents.length > 0 && (
         <div className="space-y-1.5 px-3 pb-2">

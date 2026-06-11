@@ -95,11 +95,11 @@ export default async function AgentsListPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead className="hidden sm:table-cell">Phone</TableHead>
                 <TableHead className="text-right">Leads</TableHead>
-                <TableHead className="text-right">Earned</TableHead>
-                <TableHead className="text-right">Pipeline (est.)</TableHead>
+                <TableHead className="hidden md:table-cell text-right">Earned</TableHead>
+                <TableHead className="hidden md:table-cell text-right">Pipeline (est.)</TableHead>
                 <TableHead className="hidden md:table-cell">Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -122,7 +122,7 @@ export default async function AgentsListPage() {
                 );
                 return (
                   <TableRow key={row.user_id}>
-                    <TableCell className="font-medium">
+                    <TableCell className="min-w-0 font-medium">
                       <Link
                         className="flex items-center gap-3 text-primary hover:underline"
                         href={`/admin/agents/${row.user_id}`}
@@ -147,10 +147,21 @@ export default async function AgentsListPage() {
                             </span>
                           )}
                         </span>
-                        {label}
+                        <span className="min-w-0">
+                          <span className="line-clamp-2">{label}</span>
+                          {row.email && (
+                            <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground md:hidden">
+                              {row.email}
+                            </span>
+                          )}
+                          <span className="mt-1 block text-xs font-normal text-muted-foreground md:hidden">
+                            Earned {formatZAR(totals.earned)} · Pipeline{" "}
+                            {formatZAR(totals.pipeline)}
+                          </span>
+                        </span>
                       </Link>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="hidden text-muted-foreground md:table-cell">
                       {row.email ?? "—"}
                     </TableCell>
                     <TableCell className="hidden text-muted-foreground sm:table-cell">
@@ -159,10 +170,10 @@ export default async function AgentsListPage() {
                     <TableCell className="text-right tabular-nums">
                       {leadCounts.get(row.user_id) ?? 0}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="hidden text-right tabular-nums md:table-cell">
                       {formatZAR(totals.earned)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="hidden text-right tabular-nums md:table-cell">
                       {formatZAR(totals.pipeline)}
                     </TableCell>
                     <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
